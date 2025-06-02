@@ -32,61 +32,17 @@ void briefInput(Text message, String chat) {
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
     String condition = message.getSub(0, "\n").toString();
     condition.trim();                                          //убираем лишние пробелы
-    for (int i = 0; i < condition.length(); i++) {
-      switch (faza) {
-        case 0:
-          if (isDigit(condition[i]))  {
-            less_number *= 10;
-            less_number += condition[i] - '0';
-            break;
-          }
-          else faza++;
+    for (int i = 0; i < condition.length(); ) {
+      byte c = condition[i], charLen = 1;
 
-        case 1:                                                                       //ищем номер пары
-          if (condition[i] != ' ' || condition[i] != ',' || condition[i] != '.') {
-            supp += condition[i];
-            break;
-          }
+      if ((c & 0x80) == 0x00) charLen = 1; // ASCII
+      else if ((c & 0xE0) == 0xC0) charLen = 2; // 2-byte UTF-8
+      else if ((c & 0xF0) == 0xE0) charLen = 3; // 3-byte UTF-8
+      String symbol = condition.substring(i, i + charLen);
 
-          if (supp == "пара") {
-            faza++;
-          }
+      //-------------------Код разбора условия----------------------
 
-          else if (supp.length() >= 8) {
-            i = condition.length();
-            break;
-          }
-
-        case 2:                                                                        //ищем дату (день) пары
-          if (isDigit(condition[i]))  {
-            found_day *= 10;
-            found_day += condition[i] - '0';
-
-            if (found_day > 31) {                              //проверяем введенный день на адекватность
-              bot.editMessage(m_id, "Введено некорректное значение дня!");
-              return;
-            }
-
-            if (condition[i] == '.')  faza++;
-            break;
-          }
-          break;
-
-        case 3:                                                                       //ищем дату (месяц) пары
-          if (isDigit(condition[i])) {
-            found_month *= 10;
-            found_month += condition[i] - '0';
-          }
-
-          if (found_month > 12 || found_month < 1) {
-            bot.editMessage(m_id, "Введено некорректное значение месяца!", chat);
-            return;
-          }
-
-
-          if (i == condition.length()-1)  faza++;
-          break;
-      }
+      i += charLen; // увеличиваем i на длину символа
     }
 
     if (faza != 2 && faza != 4) {
