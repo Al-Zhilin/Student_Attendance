@@ -49,6 +49,7 @@ void getNIndex(bool subgr) {
 
   if (!found) {
     bot.sendMessage(F("GetIndex: surname not found!"), error_chat);
+    timer.add(bot.lastBotMsg(), 15);
   }
   int sm = 1;
 

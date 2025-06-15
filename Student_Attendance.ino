@@ -144,18 +144,16 @@ private:
   timer_data *ptr = nullptr;
 
 public:
-  bool add(int32_t message_id, uint16_t period) {
-    if (timer_size+1 > 255)  return false;                   //проверка на переполнения счетчика сообщений, обрабатываемых тайммером
+  void add(int32_t message_id, uint16_t period) {
+    if (timer_size+1 > 255)  return;                   //проверка на переполнения счетчика сообщений, обрабатываемых тайммером
 
     timer_data *temp = (timer_data *)realloc(ptr, (++timer_size)*sizeof(timer_data));           //выделяем память под данные нового таймера
-    if (temp == nullptr)  return false;                 //проверка на успешность перераспределения памяти
+    if (temp == nullptr)  return;                 //проверка на успешность перераспределения памяти
     ptr = temp;                                     //после проверки можно вернуть на место указатель на массив с данными
     
     ptr[timer_size-1].period = period;
     ptr[timer_size-1].start_millis = millis();
     ptr[timer_size-1].message_id = message_id; 
-
-    return true;
   }
 
   void tick() {
@@ -205,7 +203,7 @@ public:
     ptr = new_ptr;
     timer_size -= delete_num;
   }
-};
+} timer;
 
 class Sheet {
   private:
@@ -225,6 +223,8 @@ class Sheet {
         }
       }
       digitalWrite(2, false);
+
+      checkTableWeek();        //функция, проверяющая, есть ли в таблице актуальная неделя, достраивающая недостающую последнюю или не только недели
 
       for (byte i = 0; i < 2; i++) {
         String answ = "", get_cell = "", range = "";
@@ -985,14 +985,12 @@ void setup() {
 void loop() {
   static int old_year = 0;
   bot.tick();
+  timer.tick();
   ArduinoOTA.handle();
   FB_Time t = bot.getTime(3);
 
   if (t.year && !old_year)  old_year = t.year;
-  else if (old_year != t.year)  {
-    checkYear();
-    bot.sendMessage("Проверяем год!", error_chat);
-  }
+  else if (old_year != t.year)  checkYear();
 
   
   
