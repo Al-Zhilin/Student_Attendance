@@ -1,6 +1,5 @@
 void newMsg(FB_msg& msg) {
   bool admin_flag = false;
-  FB_Time t(msg.unix, 3);
 
   //-----------------------------------------Обработка ТОЛЬКО чатов с админами------------------------------------------
   for (byte i = 0; i < AdmNum; i++) {

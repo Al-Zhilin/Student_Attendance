@@ -1,49 +1,78 @@
-#include "types.h"
+#include "types.h"  // Заголовок, где объявлен класс Time
 
-  Time::Time(byte h, byte m) : hours(h), minutes(m) {};
-  Time::Time() : Time(0, 0) {};
-  Time::Time(const Time &object) : hours(object.getHours()), minutes(object.getMinutes()) {};
+// Конструкторы
+Time::Time(byte h, byte m) : hours(h), minutes(m) {}
 
-  void Time::setHours(byte hours) {this->hours = hours;}
-  void Time::setMinutes(byte minutes) {this->minutes = minutes;}
-  byte Time::getHours() const {return hours;}
-  byte Time::getMinutes() const {return minutes;}
+Time::Time() : Time(0, 0) {}
 
-  Time Time::operator +(const Time &other)  {
-    int total_min = (this->hours + other.getHours())*60 + (this->minutes + other.getMinutes());
-    Time ret((total_min / 60) % 24, total_min % 60);
-    return ret;
-  }
+Time::Time(const Time &object)
+    : hours(object.getHours()), minutes(object.getMinutes()) {}
 
-  Time Time::operator +(byte &minutes) {
-    Time ret(this->hours + (this->minutes + minutes)/60, (this->minutes + minutes) % 60);
-    return ret;
-  }
+// Сеттеры
+void Time::setHours(byte hours) {
+    this->hours = hours;
+}
 
-  Time  Time::operator -(const Time &other) {
-    int total_min1, total_min2;
-    total_min1 = this->minutes + 60*this->hours;
-    total_min2 = other.getMinutes() + 60*other.getHours();
+void Time::setMinutes(byte minutes) {
+    this->minutes = minutes;
+}
 
-    if (total_min1 - total_min2 < 0)  total_min1 += 86400;
-    Time ret((total_min1 - total_min2) / 60, (total_min1 - total_min2) % 60);
-    return ret;
-  }
+// Геттеры
+byte Time::getHours() const {
+    return hours;
+}
 
-  Time Time::operator -(byte &minutes) {
-    int total_mins = this->minutes + this->hours*60 - minutes;
-    if (total_mins < 0) total_mins += 86400;
-    Time ret(total_mins / 60, total_mins % 60);
-    return ret;
-  }
+byte Time::getMinutes() const {
+    return minutes;
+}
 
-  bool Time::operator >(const Time &other) {
-    if (this->hours > other.getHours())  return true;
-    if (this->hours < other.getHours())  return false;
+// Арифметические операторы
+Time Time::operator +(const Time &other) const {
+    int total_min = (this->hours + other.getHours()) * 60 + (this->minutes + other.getMinutes());
+    return Time((total_min / 60) % 24, total_min % 60);
+}
+
+Time Time::operator +(byte minutes) const {
+    int total_minutes = this->hours * 60 + this->minutes + minutes;
+    return Time((total_minutes / 60) % 24, total_minutes % 60);
+}
+
+Time Time::operator -(const Time &other) const {
+    int total_min1 = this->hours * 60 + this->minutes;
+    int total_min2 = other.getHours() * 60 + other.getMinutes();
+
+    int diff = total_min1 - total_min2;
+    if (diff < 0) diff += 24 * 60;
+
+    return Time((diff / 60) % 24, diff % 60);
+}
+
+Time Time::operator -(byte minutes) const {
+    int total_mins = this->hours * 60 + this->minutes - minutes;
+    if (total_mins < 0) total_mins += 24 * 60;
+
+    return Time((total_mins / 60) % 24, total_mins % 60);
+}
+
+// Операторы сравнения
+bool Time::operator >(const Time &other) const {
+    if (this->hours > other.getHours()) return true;
+    if (this->hours < other.getHours()) return false;
     return this->minutes > other.getMinutes();
-  }
+}
 
-  bool Time::operator <(const Time &other)  {return !(*this > other);}
-  bool Time::operator ==(const Time &other) {return (this->hours == other.getHours() || this->minutes == other.getMinutes());}
-  bool Time::operator >=(const Time &other)  {return !(*this < other);}
-  bool Time::operator <=(const Time &other) {return !(*this > other);}
+bool Time::operator <(const Time &other) const {
+    return !(*this > other) && !(*this == other);
+}
+
+bool Time::operator ==(const Time &other) const {
+    return (this->hours == other.getHours()) && (this->minutes == other.getMinutes());
+}
+
+bool Time::operator >=(const Time &other) const {
+    return (*this > other) || (*this == other);
+}
+
+bool Time::operator <=(const Time &other) const {
+    return !(*this > other);
+}

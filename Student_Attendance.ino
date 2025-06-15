@@ -19,6 +19,7 @@
 #define AdmNum 1                                                                                 //кол-во админов с начала списка, которые смогут ставить Нки
 #define SerialDebug 0                                                                            //вкл/выкл (1/0 соответственно) отладка в Serial
 #define SURNAME_ERRORS_NUM 2                                                                     //количество допускаемых ошибок в фамилии при сокращенном вводе (количество посимвольных отличий между вводимой фамилией и фамилией из списка)
+#define MINUTES_OFFSET 5                                                                         //Допустимый оффсет по времени, для определения, какая пара сейчас идет (позволяет определять, что сейчас идет N-ая пара, даже если сейчас часы_начала_пары:минуты_начала-<значение> или аналогично для конца пары)
 //-------------------------------------НАСТРОЙКИ-------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -131,6 +132,80 @@ void checkYear() {
   else day_month[1] = 28;
 }
 
+struct timer_data {
+  uint32_t start_millis = 0;
+  int32_t message_id = 0;
+  uint16_t period = 0;            //в секундах
+};
+
+class DeleteTimer {
+private:
+  byte timer_size = 0;
+  timer_data *ptr = nullptr;
+
+public:
+  bool add(int32_t message_id, uint16_t period) {
+    if (timer_size+1 > 255)  return false;                   //проверка на переполнения счетчика сообщений, обрабатываемых тайммером
+
+    timer_data *temp = (timer_data *)realloc(ptr, (++timer_size)*sizeof(timer_data));           //выделяем память под данные нового таймера
+    if (temp == nullptr)  return false;                 //проверка на успешность перераспределения памяти
+    ptr = temp;                                     //после проверки можно вернуть на место указатель на массив с данными
+    
+    ptr[timer_size-1].period = period;
+    ptr[timer_size-1].start_millis = millis();
+    ptr[timer_size-1].message_id = message_id; 
+
+    return true;
+  }
+
+  void tick() {
+    static uint32_t tick_timer = millis(), tick_period = 200;         //период проверки сработки таймеров сделаем 200 мс
+    
+    if (millis() - tick_timer >= tick_period) {
+      tick_timer = millis();
+      bool need_delete = false;
+      for (byte i = 0; i < timer_size; i++) {
+        if (millis() - ptr[i].start_millis >= ptr[i].period*1000) {
+          bot.deleteMessage(ptr[i].message_id);
+          ptr[i].message_id = -1;
+          need_delete = true;
+        }
+      }
+      if (need_delete)  MyRealloc();
+    }
+  }
+
+  void MyRealloc() {            //очищаем массив от данных обьектов, которые уже сработали
+    byte delete_num = 0;
+
+    if (ptr == nullptr)   return;           //невозможная ситуация, но пропишем и ее на всякий
+
+    for (byte i = 0; i < timer_size; i++) {                 //узнаем, сколько элементов надо удалить
+      if (ptr[i].message_id == -1)  delete_num++;
+    }
+
+    if (delete_num == timer_size) {         //если нужно удалить все элементы - удаляем, делаем указатель nullprt и выходим, в таком случае больше ничего не надо делать
+      free(ptr);
+      ptr = nullptr;
+      timer_size = 0;
+      return;
+    }
+
+    byte supp = 0;
+    timer_data *new_ptr = (timer_data*) calloc((timer_size-delete_num), sizeof(timer_data));
+
+    if (new_ptr == nullptr)   return;             //не удалось выделить память под новый массив        
+
+    for (byte i = 0; i < timer_size; i++) {
+      if (ptr[i].message_id == -1)  supp++;
+      else  new_ptr[i-supp] = ptr[i];
+    }
+
+    free(ptr);
+    ptr = new_ptr;
+    timer_size -= delete_num;
+  }
+};
 
 class Sheet {
   private:
