@@ -458,7 +458,7 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        if (menu_id[i] != "") bot.editMenu(menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
+        if (menu_id[i]) bot.editMenu(menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
         else {
           bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1], Admins[i]);
           menu_id[i] = bot.lastBotMsg();
