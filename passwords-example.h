@@ -12,6 +12,7 @@
 #define BOT_USERNAME ""                                                                          //юзернейм бота
 #define OTA_NAME ""                                                                              //имя для OTA
 #define OTA_PASS ""                                                                              //пароль для OTA
+#define GROUP_COMMANDER ""                                                                       //юзернейм старосты
 
 //---------------------------------Ключи и id для доступа к таблице---------------------------------
 const char PRIVATE_KEY[] PROGMEM = "";
@@ -29,6 +30,10 @@ struct lesson_borders {
 
 const String Admins[] = {    
   "",
+  "",
+};
+
+const String Groups[] = {
   "",
   "",
 };

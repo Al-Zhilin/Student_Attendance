@@ -1,8 +1,33 @@
 void newMsg(FB_msg& msg) {
-  bool admin_flag = false;
+  bool undefined_user = true;
+  static String last_undefined = "";
+
+  if (msg.chatID == last_undefined) return;       //неизвестный пишет снова. Просто игнорируем
+
+  for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+    if (msg.chatID == Admins[i])  {
+      undefined_user = false;
+      break;
+    }
+  }
+
+  if (undefined_user) {
+    for (byte i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {
+      if (msg.chatID == Groups[i])  {
+      undefined_user = false;
+      break;
+    }
+    }
+  }
+
+  if (undefined_user) {       //отправитель сообщения не задан как админ или поддерживаемая группа, с такими не общаемся
+    last_undefined = msg.chatID;
+    bot.sendMessage(msg.username + ", по всей информации обращайтесь к старосте (" + GROUP_COMMANDER + ") или в общую группу!", msg.chatID);
+    return;
+  }
 
   //-----------------------------------------Обработка ТОЛЬКО чатов с админами------------------------------------------
-  for (byte i = 0; i < AdmNum; i++) {
+  for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
     if (msg.chatID == Admins[i]) {
 
       if (msg.OTA) bot.update();
@@ -29,16 +54,15 @@ void newMsg(FB_msg& msg) {
         Text mess_text(msg.text);
         briefInput(mess_text.decodeUnicode(), msg.chatID);                                    //обработка возможного сокращенного ввода
       }
-
-      admin_flag = true;
       break;     
     }
   }
 
-  //-------------------------------------------Обработка ТОЛЬКО публичных чатов------------------------------------------
-  if (!admin_flag) {                    
-    if (msg.text == BOT_USERNAME) bot.replyMessage("Чо случилось? Список моих возможностей можно посмотреть с помощью /comms", bot.lastUsrMsg());
-
+  //-------------------------------------------Обработка ТОЛЬКО групп------------------------------------------
+  for (int i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {                   
+    if (msg.chatID == Groups[i]) {
+      if (msg.text == BOT_USERNAME) bot.replyMessage("Чо случилось? Список моих возможностей можно посмотреть с помощью /comms", bot.lastUsrMsg());
+    }
   }
 
 

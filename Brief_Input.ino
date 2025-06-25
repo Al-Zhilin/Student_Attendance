@@ -29,13 +29,14 @@ void briefInput(Text message, String chat) {
   if (input_found == 0)  return;         //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
   bot.sendMessage("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...", chat);
+  timer.add(bot.lastBotMsg(), 17);
   m_id = bot.lastBotMsg();
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
     String condition = message.getSub(0, "\n").toString();
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
-    if (condition.endsWith("вчера") || condition.endsWith("позавчера")) unique_end = true;
+    if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
     for (int i = 0; i < condition.length(); ) {
       byte c = condition[i], charLen = 1;
 
@@ -77,6 +78,7 @@ void briefInput(Text message, String chat) {
     if (faza == 2 && unique_end) {
       if (condition.endsWith("вчера"))  found_day = real_time.day-1;
       else if (condition.endsWith("позавчера")) found_day = real_time.day-2;
+      else if (condition.endsWith("сегодня")) found_day = real_time.day;
       found_month = real_time.month;
     } 
 
@@ -99,7 +101,7 @@ void briefInput(Text message, String chat) {
       }
     }
     if (!found_less) {
-      bot.editMessage(m_id, "Не удалось получить информацию о паре, которая идет прямо сейчас в сокращенном вводе без условия! Проверьте MINUTES_OFFSET в настройках программы или укажите условие вручную!");
+      bot.editMessage(m_id, "Не удалось получить информацию о паре, которая идет прямо сейчас в сокращенном вводе без условия! Проверьте MINUTES_OFFSET в настройках программы, заданы ли временный рамки для данной пары в структуре или укажите условие вручную!");
       return;
     }
   }
@@ -123,7 +125,7 @@ void briefInput(Text message, String chat) {
       if (func_res == 2 && syntax_errors <= min_syntax_errors) {
         if (syntax_errors == min_syntax_errors) {
           bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString());
-          timer.add(bot.lastBotMsg(), 7);
+          timer.add(bot.lastBotMsg(), 10);
           break;
         }
         min_syntax_errors = syntax_errors;
@@ -139,10 +141,9 @@ void briefInput(Text message, String chat) {
     }
     if (!surname_found) {
       bot.sendMessage("Неизвестная фамилия: " + String(dataa) + "!", chat);
-      timer.add(bot.lastBotMsg(), 7);
+      timer.add(bot.lastBotMsg(), 10);
     }
   }
 
   bot.editMessage(m_id, "Сокращенный ввод обработан!");
-  timer.add(bot.lastBotMsg(), 7);
 }

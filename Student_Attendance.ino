@@ -16,7 +16,6 @@
 #define Disrep "❌"                                                                              //символ, соответствующий неУП в меню
 #define GetTryNum 3                                                                              //количество попыток получить данные из таблицы, после них - вывод ошибки
 #define SetTryNum 3                                                                              //количество попыток отправить данные в таблицу, после них - вывод ошибки
-#define AdmNum 1                                                                                 //кол-во админов с начала списка, которые смогут ставить Нки
 #define SerialDebug 0                                                                            //вкл/выкл (1/0 соответственно) отладка в Serial
 #define SURNAME_ERRORS_NUM 2                                                                     //количество допускаемых ошибок в фамилии при сокращенном вводе (количество посимвольных отличий между вводимой фамилией и фамилией из списка)
 #define MINUTES_OFFSET 5                                                                         //Допустимый оффсет по времени, для определения, какая пара сейчас идет (позволяет определять, что сейчас идет N-ая пара, даже если сейчас часы_начала_пары:минуты_начала-<значение> или аналогично для конца пары)
@@ -34,7 +33,7 @@ byte offset[] = {23, 24};                                                       
 #define Sheet1 "People1!"                                                                         //имя листа, с данными о людях первой подгруппы
 #define Sheet2 "People2!"                                                                         //имя листа, с данными о людях второй подгруппы
 
-#define weekInfo_c 'B'                                                                            //дата первого дня недели (данные ячейки)
+#define weekInfo_c 'B'                                                                            //информация из заглавной ячейки недели (данные ячейки)
 #define weekInfo_i 2
 
 #define less_num_c 'C'                                                                            //номер первой пары первого дня (данные ячейки)
@@ -50,7 +49,7 @@ byte offset[] = {23, 24};                                                       
 
 FastBot bot(BOT_TOKEN);
 
-byte week_off = 12;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
+byte week_off = 13;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
 bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
 
@@ -139,11 +138,11 @@ struct timer_data {
 };
 
 class DeleteTimer {
-private:
+  private:
   byte timer_size = 0;
   timer_data *ptr = nullptr;
 
-public:
+  public:
   void add(int32_t message_id, uint16_t period) {
     if (timer_size+1 > 255)  return;                   //проверка на переполнения счетчика сообщений, обрабатываемых тайммером
 
@@ -267,8 +266,8 @@ class Sheet {
         ans = answer.getSub(r_count+r_offset, "\"");
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
-          if (!iter)  week[i].pon_day = (cell[0] - '0')*10 + cell[1] - '0';
-          else  week[i].pon_month = (cell[0] - '0')*10 + cell[1] - '0';
+          if (iter == 0)  week[i].pon_day = (cell[0] - '0')*10 + cell[1] - '0';
+          else if (iter == 1)  week[i].pon_month = (cell[0] - '0')*10 + cell[1] - '0';
         }
         //----------------------Дата понедельника этой недели---------------------------
 
@@ -441,28 +440,27 @@ class Sheet {
 
 class Menu {
   private:
-    int32_t menu_id[AdmNum] = {};
+    int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
-    String s_menu[3] = {"Редактировать", "Подсчитать"};
+    String s_menu[2] = {"Редактировать", "Подсчитать"};
     String way = "10000";
 
   public:
-    void start_page() {
+    void start_page(bool mode) {
       if (way == "10000") way = "0";
 
-      if (AdmNum > sizeof(Admins)/sizeof(Admins[0])) {
-        bot.sendMessage("Число AdmNum больше кол-ва указанных пользователей! Измените данные и попробуйте снова!", error_chat);
-        for(;;);
+      if (!mode)  {
+        for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+          bot.sendMessage("______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[i]);
+        }
+        return;
       }
 
-      for (byte i = 0; i < AdmNum; i++) {
-        if (menu_id[i]) bot.editMenu(menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
-        else  {
-          bot.sendMessage("______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[i]);
-          delay(100);
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+        if (menu_id[i] != "") bot.editMenu(menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
+        else {
           bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1], Admins[i]);
-          bot.pinMessage(bot.lastBotMsg());
           menu_id[i] = bot.lastBotMsg();
         }
       }
@@ -495,7 +493,7 @@ class Menu {
 
         if (ret_command)  {
           ret_command = false;
-          start_page();
+          start_page(1);
         }
         
         else  bot.sendMessage("err_menu", error_chat);  //штобы не спамила всякое
@@ -908,7 +906,7 @@ class Menu {
         break;
       }
 
-      for (byte i = 0; i < AdmNum; i++) {
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         bot.editMenu(menu_id[i], mess, Admins[i]);
       }
     }
@@ -951,7 +949,7 @@ class Menu {
         break;
       }
 
-      for (byte i = 0; i < AdmNum; i++) {
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         bot.editMenu(menu_id[i], mess, Admins[i]);
       }
     }
@@ -964,21 +962,14 @@ void setup() {
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
   pinMode(2, OUTPUT);
 
-  String str = "";
-  for (byte i = 0; i < (sizeof(Admins) / sizeof(Admins[0])); i++) {           //собираем строку пользователей-админов
-    str += Admins[i];
-    str += ",";
-  }
-
-  bot.setChatID(str);                                                         //устанавливаем чаты админов, другим людям он отвечать не будет
-  bot.unpinAll();
   bot.clearServiceMessages(true);
   ArduinoOTA.setHostname(OTA_NAME);
   ArduinoOTA.setPassword(OTA_PASS);
   ArduinoOTA.begin();
 
+  menu.start_page(0);       //чисто для обновления времени
   list.begin();
-  menu.start_page();
+  menu.start_page(1);       //вот тут уже достраиваем стартовую страницу окончательно
   checkYear();
 }
 
@@ -989,11 +980,7 @@ void loop() {
   ArduinoOTA.handle();
   FB_Time t = bot.getTime(3);
 
-  if (t.year && !old_year)  old_year = t.year;
-  else if (old_year != t.year)  checkYear();
-
-  
-  
-
+  if (t.year && !old_year)  old_year = t.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
+  else if (old_year != t.year)  checkYear();          //Если год сменился - опа, произошел новый год, то проверяем на високосность
 
 }
