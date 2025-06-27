@@ -226,7 +226,7 @@ class Sheet {
       checkTableWeek();        //функция, проверяющая, есть ли в таблице актуальная неделя, достраивающая недостающую последнюю или не только недели
 
       for (byte i = 0; i < 2; i++) {
-        String answ = "", get_cell = "", range = "";
+        String get_cell = "", range = "";
         if (!i) range += Sheet1;
         else range += Sheet2;
 
@@ -236,8 +236,7 @@ class Sheet {
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
         range += (weekInfo_i + (offset[i]*(week_off-1)));
-        answ = this->getCells(range);
-        Text answer(answ);
+        Text answer(this->getCells(range));
         Text ans = answer.getSub(r_count, "\"");
         for (byte iter = 0; iter < ans.count("/"); iter++) {
           ans.getSub(iter, "/").toString(get_cell);
@@ -288,8 +287,7 @@ class Sheet {
 
         range += charOffset(String(less_num_c), len);
         range += (less_num_i + (offset[i]*(week_off-1)));
-        answ = this->getCells(range);
-        Text answa(answ);
+        Text answa(this->getCells(range));
         byte faza = 0, supp = 0, iteration = 0;
         for (int s = 0; s < len; s++) {
           Text this_cell = answa.getSub(r_count + r_offset*s, "\"");
@@ -336,8 +334,7 @@ class Sheet {
 
         range += charOffset(String(less_name_c), len);
         range += (less_name_i + (offset[i]*(week_off-1)));
-        answ = this->getCells(range);
-        Text answa_2(answ);
+        Text answa_2(this->getCells(range));
         faza = 0;
         supp = 0;
         iteration = 0;
