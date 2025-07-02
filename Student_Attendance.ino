@@ -493,7 +493,7 @@ class Menu {
           start_page(1);
         }
         
-        else  bot.sendMessage("err_menu", error_chat);  //штобы не спамила всякое
+        else  bot.sendMessage("err_menu", error_chat);
       }
 
       if (way.startsWith("01")) {                                                     //ветка редактирования 
