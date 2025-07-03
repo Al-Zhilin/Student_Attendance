@@ -220,7 +220,7 @@ class Sheet {
         if (millis() - reset_timer >= 60*1000) {
           ESP.restart();
         }
-      }
+      } 
       digitalWrite(2, false);
 
       
