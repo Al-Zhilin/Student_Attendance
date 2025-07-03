@@ -223,13 +223,12 @@ class Sheet {
       }
       digitalWrite(2, false);
 
-      checkTableWeek();        //функция, проверяющая, есть ли в таблице актуальная неделя, достраивающая недостающую последнюю или не только недели
-
+      
       for (byte i = 0; i < 2; i++) {
         String get_cell = "", range = "";
         if (!i) range += Sheet1;
         else range += Sheet2;
-
+        
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
         range += weekInfo_c;
         range += (weekInfo_i + (offset[i]*(week_off-1)));
@@ -265,8 +264,10 @@ class Sheet {
         ans = answer.getSub(r_count+r_offset, "\"");
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
-          if (iter == 0)  week[i].pon_day = (cell[0] - '0')*10 + cell[1] - '0';
-          else if (iter == 1)  week[i].pon_month = (cell[0] - '0')*10 + cell[1] - '0';
+          for (byte q = 0; q < cell.length(); q++) {
+            if (iter == 0)  week[i].pon_day = (week[i].pon_day * 10 + cell[q] - '0');
+            else if (iter == 1)  week[i].pon_month = (week[i].pon_month * 10 + cell[q] - '0');
+          }
         }
         //----------------------Дата понедельника этой недели---------------------------
 
@@ -363,6 +364,8 @@ class Sheet {
         //-----------------------Получение четности всех пар----------------------------
 
       }
+
+      checkTableWeek());        //после вытягивания всех данных проверяем их на валидность текущей дате
     }
 
     String getCells(String range) {

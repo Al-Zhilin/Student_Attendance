@@ -76,3 +76,7 @@ bool Time::operator >=(const Time &other) const {
 bool Time::operator <=(const Time &other) const {
     return !(*this > other);
 }
+
+bool Time::operator !=(const Time &other) const {
+    return !(*this == other);
+}
