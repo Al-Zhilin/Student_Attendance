@@ -260,10 +260,10 @@ class Sheet {
 
         //----------------------Дата понедельника этой недели---------------------------
         ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
-        /*
-        String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта хуйня №1
+        
+        String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта фигня №1
         firstDayName.toLowerCase();
-        */
+        
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
           for (byte q = 0; q < cell.length(); q++) {
@@ -272,7 +272,7 @@ class Sheet {
           }
         }
         
-        /*if (firstDayName != "понедельник") {            непонятно, нужна ли эта хуйня №2
+        if (firstDayName != "понедельник") {                  //непонятно, нужна ли эта фигня №2
           if (firstDayName == "вторник")  week[i].pon_day--;
           else if (firstDayName == "среда") week[i].pon_day-=2;
           else if (firstDayName == "четверг") week[i].pon_day-=3;
@@ -280,7 +280,7 @@ class Sheet {
           else if (firstDayName == "суббота") week[i].pon_day-=5;
           else if (firstDayName == "воскресенье") week[i].pon_day-=6;
           else bot.sendMessage(F("[!CRITICAL] Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели!"));
-        }*/
+        }
         //----------------------Дата понедельника этой недели---------------------------
 
 
@@ -292,13 +292,13 @@ class Sheet {
         range += (less_num_i + (offset[i]*(week_off-1)));
         range += ":";
         byte len = 0;
-        byte prev = 17;     //любое значение, которое никогда не достигнет цикл 0...6
+        bool prev = false;
 
         for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар
           if (week[i].subj_num[s] == 0) continue;
-          if (prev != 17) len += 1;
+          if (prev) len += 1;
           len += week[i].subj_num[s];
-          prev = s;
+          prev = true;
         }
 
         range += charOffset(String(less_num_c), len);
