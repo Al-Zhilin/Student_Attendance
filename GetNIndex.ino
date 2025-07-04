@@ -52,13 +52,15 @@ void getNIndex(bool subgr) {
     timer.add(bot.lastBotMsg(), 15);
   }
   int sm = 1;
+  bool prev = false;
 
   for (int i = 0; i < days_ago; i++) {
-    if (week[subgr].subj_num[i] == 0) sm++;
-    else {
-      sm += week[subgr].subj_num[i];
-    }
-    sm++;
+    if (week[subgr].subj_num[i] == 0) continue;
+
+    if (prev) sm++;          // разделитель между непустыми днями
+    else prev = true;
+
+    sm += week[subgr].subj_num[i];
   }
   
   if (weeks_ago % 2 == 0) nka.parity = week[nka.subgroup].parity;
