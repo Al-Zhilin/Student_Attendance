@@ -17,7 +17,7 @@
 #define GetTryNum 3                                                                              //количество попыток получить данные из таблицы, после них - вывод ошибки
 #define SetTryNum 3                                                                              //количество попыток отправить данные в таблицу, после них - вывод ошибки
 #define SerialDebug 0                                                                            //вкл/выкл (1/0 соответственно) отладка в Serial
-#define SURNAME_ERRORS_NUM 2                                                                     //количество допускаемых ошибок в фамилии при сокращенном вводе (количество посимвольных отличий между вводимой фамилией и фамилией из списка)
+#define SURNAME_ERRORS_NUM 2                                                                     //количество допускаемых ошибок в фамилии при сокращенном вводе (количество посимвольных отличий между вводимой фамилией и соответствующей фамилией из списка)
 #define MINUTES_OFFSET 5                                                                         //Допустимый оффсет по времени, для определения, какая пара сейчас идет (позволяет определять, что сейчас идет N-ая пара, даже если сейчас часы_начала_пары:минуты_начала-<значение> или аналогично для конца пары)
 //-------------------------------------НАСТРОЙКИ-------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -104,7 +104,6 @@ struct WeekInfo {
   byte pon_month = 0;             //месяц понедельника этой недели  (week_info_c + 1; week_info_i) [3:4]
   byte study_days = 0;            //количество учебных дней в неделе  (week_info_c; week_info_i) после /
   byte subj_num[7] = {};          //кол-во пар в учебных днях (less_mun_c; less_num_i)......
-  byte *less_parity[7];           //четность/нечетность каждой пары в каждый день (0 - пара в любую неделю, 1 - только в четную неделю, 2 - только в нечетную неделю, 3 - пара пустая)
   byte *less_nums[7];             //номера всех пар в дне
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
 
@@ -253,8 +252,7 @@ class Sheet {
           else { 
             if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
             week[i].subj_num[iter-2] = cell.toInt();
-            week[i].less_parity[iter-2] = new byte[week[i].subj_num[iter-2]]{};                //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения четности/нечетности каждой пары в каждый день)
-            week[i].less_nums[iter-2] = new byte[week[i].subj_num[iter-2]]{};                  //и еще раз, для хранения номера каждой пары в каждом дне
+            week[i].less_nums[iter-2] = new byte[week[i].subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
           }
         }
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
@@ -317,55 +315,9 @@ class Sheet {
           bot.sendMessage("----------");
         }*/
         //-----------------------Получение номеров всех пар-----------------------------
-
-
-        //-----------------------Получение четности всех пар----------------------------
-        range = "";
-        if (!i) range += Sheet1;
-        else range += Sheet2;
-        range += less_name_c;
-        range += (less_name_i + (offset[i]*(week_off-1)));
-        range += ":";
-        len = 0;
-        for (int s = 0; s < 7; s++) {
-          if (!week[i].subj_num[s]) len += 1;
-          else len += week[i].subj_num[s];
-          if (s != 6) len += 1;  
-        }
-
-        range += charOffset(String(less_name_c), len);
-        range += (less_name_i + (offset[i]*(week_off-1)));
-        Text answa_2(this->getCells(range));
-        faza = 0;
-        supp = 0;
-        iteration = 0;
-        for (int s = 0; s < len; s++) {
-          Text this_cell = answa_2.getSub(r_count + r_offset*s, "\"").trim();
-          byte s_num = week[i].subj_num[faza];
-          if (!s_num) s_num++;
-
-          if (supp != s_num) {
-            if (!this_cell)  week[i].less_parity[faza][iteration] = 3;                                      //отсутствует пара
-            else if (this_cell.endsWith("/"))  week[i].less_parity[faza][iteration] = 1;                    //по четным неделям
-            else if (this_cell.startsWith("/"))  week[i].less_parity[faza][iteration] = 2;                  //по нечетным неделям
-            else week[i].less_parity[faza][iteration] = 0;                                                  //в любую неделю
-            //bot.sendMessage(String(week[i].less_parity[faza][iteration]) + ":" + this_cell.toString());                         //вывод для отладки
-            supp++;
-            iteration++;
-          }
-
-          else {
-            //bot.sendMessage("-----------");         //вывод для отладки
-            supp = 0;
-            faza++;
-            iteration = 0;
-          }
-        }
-        //-----------------------Получение четности всех пар----------------------------
-
       }
 
-      checkTableWeek());        //после вытягивания всех данных проверяем их на валидность текущей дате
+      checkTableWeek();        //после вытягивания всех данных проверяем их на валидность текущей дате
     }
 
     String getCells(String range) {
@@ -397,7 +349,7 @@ class Sheet {
         else data = "D";
         valueRange.set(address, data);
       }
-  
+      
       while (!GSheet.values.update(&answ, spreadsheetId, range, &valueRange) && tries < SetTryNum) {
         tries++;
       }
@@ -544,39 +496,21 @@ class Menu {
           }
 
           else if (comm == "Все УП") {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
-              if (!(nka.parity == week[nka.subgroup].less_parity[nka.dayWeek-1][i]-1 || !week[nka.subgroup].less_parity[nka.dayWeek-1][i])) {
-                nka.nki[i] = ' ';
-                continue;
-              }
-              nka.nki[i] = '+';
-            }
+            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '+';
             reading_flag = false;
             edit_page(1);
             return;
           }
 
           else if (comm == "Все неУП") {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
-              if (!(nka.parity == week[nka.subgroup].less_parity[nka.dayWeek-1][i]-1 || !week[nka.subgroup].less_parity[nka.dayWeek-1][i])) {
-                nka.nki[i] = ' ';
-                continue;
-              }
-              nka.nki[i] = '-';
-            }
+            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '-';
             reading_flag = false;
             edit_page(1);
             return;
           }
 
           else if (comm == "Нет пропусков") {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
-              if (!(nka.parity == week[nka.subgroup].less_parity[nka.dayWeek-1][i]-1 || !week[nka.subgroup].less_parity[nka.dayWeek-1][i])) {
-                nka.nki[i] = ' ';
-                continue;
-              }
-              nka.nki[i] = ' ';
-            }
+            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) nka.nki[i] = ' ';
             reading_flag = false;
             edit_page(1);
             return;
@@ -600,6 +534,7 @@ class Menu {
 
           else if (comm.startsWith("В этот")) {
             bot.sendMessage("Чо жмешь? Сказали же, пар в выбранный день нет!", user);
+            timer.add(bot.lastBotMsg(), 7);
             return;
           }
 
@@ -789,10 +724,6 @@ class Menu {
             }
 
             for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
-              if (!(nka.parity == week[nka.subgroup].less_parity[nka.dayWeek-1][i]-1 || !week[nka.subgroup].less_parity[nka.dayWeek-1][i])) {
-                if (i == week[nka.subgroup].subj_num[nka.dayWeek-1]-1)  mess[mess.length()-1] = '\n';
-                continue;
-              }
               mess += "(";
               mess += week[nka.subgroup].less_nums[nka.dayWeek-1][i];
               mess += ") ";
