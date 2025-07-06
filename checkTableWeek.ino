@@ -4,7 +4,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
   if (realTime.day == 0) {
-    bot.sendMessage("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!", Admins[0]);
+    bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), Admins[0]);
     timer.add(bot.lastBotMsg(), 10);
   }
 
@@ -37,12 +37,67 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   
   for (byte i = 0; i < 2; i++) {                          //цикл для всех листов
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
+
       
+
+      int srcRowStart = 0, srcRowEnd = 10;
+      int srcColStart = 0, srcColEnd = 3;
+      int dstRowStart = 0, dstColStart = 5;
+
+      int clearRowStart = 2, clearRowEnd = 4;
+      int clearColStart = 5, clearColEnd = 8;
+
+      FirebaseJsonArray requests;
+      FirebaseJson request;
+      
+      if (!i) request.set("copyPaste/source/range/sheetId", SHEET1_ID);
+      else  request.set("copyPaste/source/range/sheetId", SHEET2_ID);
+
+      request.set("copyPaste/source/range/startRowIndex", srcRowStart);
+      request.set("copyPaste/source/range/endRowIndex", srcRowEnd);
+      request.set("copyPaste/source/range/startColumnIndex", srcColStart);
+      request.set("copyPaste/source/range/endColumnIndex", srcColEnd);
+      if (!i) request.set("copyPaste/destination/range/sheetId", SHEET1_ID);
+      else  request.set("copyPaste/destination/range/sheetId", SHEET2_ID);
+      request.set("copyPaste/destination/range/startRowIndex", dstRowStart);
+      request.set("copyPaste/destination/range/startColumnIndex", dstColStart);
+      request.set("copyPaste/pasteType", "PASTE_NORMAL");
+    
+      requests.add(request);
+      request.clear();
+
+      if (!i) request.set("repeatCell/range/sheetId", SHEET1_ID);
+      else request.set("repeatCell/range/sheetId", SHEET2_ID);
+      request.set("repeatCell/range/startRowIndex", clearRowStart);
+      request.set("repeatCell/range/endRowIndex", clearRowEnd);
+      request.set("repeatCell/range/startColumnIndex", clearColStart);
+      request.set("repeatCell/range/endColumnIndex", clearColEnd);
+      request.set("repeatCell/cell/userEnteredValue/stringValue", "");
+      request.set("repeatCell/fields", "userEnteredValue");
+      requests.add(request);
+      request.clear();
+
+      FirebaseJson response;
+      bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
+      response.clear();
+
+      requests.clear();
     }
   }
-
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   EEPROM_PUT(0, week_off);
   return weeksToBuild;
   return 0;
 }
+
+uint16_t columnLetterToIndex(const String& col) {         //конвертация буквенной части адреса ячейки в абсолютное числовое значение (такой формат требует batchUpdate)
+  uint16_t result = 0;
+  for (uint16_t i = 0; i < col.length(); ++i) {
+    char c = toupper(col[i]);
+    if (c < 'A' || c > 'Z') break;
+    result = result * 26 + (c - 'A' + 1);
+  }
+  return result - 1;
+}
+
+

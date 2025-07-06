@@ -145,5 +145,5 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  bot.editMessage(m_id, "Сокращенный ввод обработан!");
+  bot.editMessage(m_id, F("Сокращенный ввод обработан!"));
 }
