@@ -9,16 +9,16 @@ void WiFi_Connect () {
   while (WiFi.status() != WL_CONNECTED && millis() - start_time < WIFI_RES_PERIOD) {        
     delay(1000);
     
-    Serial.print("Connecting to \"");
+    Serial.print(F("Connecting to \""));
     Serial.print(ssid);
     Serial.println("\"...");
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("Restarting (timer overflow)!");
+    Serial.println(F("Restarting (timer overflow)!"));
     ESP.restart();
   }
 
-  Serial.println("Connected!"); 
+  Serial.println(F("Connected!")); 
   randomSeed(micros());
 }

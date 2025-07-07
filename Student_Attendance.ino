@@ -52,6 +52,7 @@ FastBot bot(BOT_TOKEN);
 byte week_off = 13;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
 bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
+byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 const String months[] = {
   "Янв",
@@ -104,7 +105,7 @@ struct WeekInfo {
   byte pon_month = 0;             //месяц понедельника этой недели  (week_info_c + 1; week_info_i) [3:4]
   byte study_days = 0;            //количество учебных дней в неделе  (week_info_c; week_info_i) после /
   byte subj_num[7] = {};          //кол-во пар в учебных днях (less_mun_c; less_num_i)......
-  byte *less_nums[7] = {};             //номера всех пар в дне
+  byte *less_nums[7] = {};        //номера всех пар в дне
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
 
 } week[4];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы. 3 и 4 - соответственно для другой четности недели
@@ -926,6 +927,8 @@ void setup() {
   list.begin();
   menu.start_page(1);       //вот тут уже достраиваем стартовую страницу окончательно
   checkYear();
+
+  for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе
 }
 
 void loop() {

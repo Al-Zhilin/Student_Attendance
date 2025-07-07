@@ -34,30 +34,31 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
+  
+  byte tableLen[4] = {};        //длина таблицы для 2 подгрупп для 2 вариантов четности
 
-  for (byte i = 0; i < 2; i++) {                          //цикл для всех листов
-    
-    if (!week[2+i].pon_day) {         //если структура не содержит актуальных или вообще каких-нибудь данных - обновляем
-      String range = "";
-      if (!i) range += Sheet1;
-      else range += Sheet2;
-      range += weekInfo_c;
-      range += (weekInfo_i + (offset[i]*(week_off-2)));
-      range += ":";
-      range += charOffset(String(weekInfo_c), 1);
-      range += (weekInfo_i + (offset[i]*(week_off-2)));
-      Text answer(list.getCells(range));
-      list.getBriefCellData(&week[2+i], answer);
+  for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
+
+    if (!week[2+i].pon_day) {         //если структура не содержит данных - заполняем
+        String range = "";
+        if (!i) range += Sheet1;
+        else range += Sheet2;
+        range += weekInfo_c;
+        range += (weekInfo_i + (offset[i]*(week_off-2)));
+        range += ":";
+        range += charOffset(String(weekInfo_c), 1);
+        range += (weekInfo_i + (offset[i]*(week_off-2)));
+        Text answer(list.getCells(range));
+        list.getBriefCellData(&week[2+i], answer);
     }
 
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
 
-      int srcRowStart = 0, srcRowEnd = 10;
-      int srcColStart = 0, srcColEnd = 3;
-      int dstRowStart = 0, dstColStart = 5;
+      int srcColEnd = 3;           //столбец конца диапазона копирования
+      int dstRowStart = 0, dstColStart = 5;         //строка и столбец ячейки вставки скопированного диапазона
 
-      int clearRowStart = 2, clearRowEnd = 4;
-      int clearColStart = 5, clearColEnd = 8;
+      int clearRowStart = 2, clearRowEnd = 4;       //строки начала и конца диапазона очистки
+      int clearColStart = 5, clearColEnd = 8;       //столбцы начала и конца диапазона очистки
 
       FirebaseJsonArray requests;
       FirebaseJson request;
@@ -65,9 +66,9 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       if (!i) request.set("copyPaste/source/range/sheetId", SHEET1_ID);
       else  request.set("copyPaste/source/range/sheetId", SHEET2_ID);
 
-      request.set("copyPaste/source/range/startRowIndex", srcRowStart);
-      request.set("copyPaste/source/range/endRowIndex", srcRowEnd);
-      request.set("copyPaste/source/range/startColumnIndex", srcColStart);
+      request.set("copyPaste/source/range/startRowIndex", (weekInfo_i + (offset[i]*(week_off-2+iter)))) - 1;
+      request.set("copyPaste/source/range/endRowIndex", (people_list_i + (offset[i]*(week_off-2+iter))) + people_in_subgr[i]) - 1;
+      request.set("copyPaste/source/range/startColumnIndex", columnLetterToIndex(charOffset(weekInfo_c, -1)));
       request.set("copyPaste/source/range/endColumnIndex", srcColEnd);
 
       if (!i) request.set("copyPaste/destination/range/sheetId", SHEET1_ID);
