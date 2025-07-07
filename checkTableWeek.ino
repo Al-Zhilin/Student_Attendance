@@ -34,14 +34,23 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  WeekInfo other_parity_week;
-
-  
 
   for (byte i = 0; i < 2; i++) {                          //цикл для всех листов
+    
+    if (!week[2+i].pon_day) {         //если структура не содержит актуальных или вообще каких-нибудь данных - обновляем
+      String range = "";
+      if (!i) range += Sheet1;
+      else range += Sheet2;
+      range += weekInfo_c;
+      range += (weekInfo_i + (offset[i]*(week_off-2)));
+      range += ":";
+      range += charOffset(String(weekInfo_c), 1);
+      range += (weekInfo_i + (offset[i]*(week_off-2)));
+      Text answer(list.getCells(range));
+      list.getBriefCellData(&week[2+i], answer);
+    }
+
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
-
-
 
       int srcRowStart = 0, srcRowEnd = 10;
       int srcColStart = 0, srcColEnd = 3;
@@ -60,8 +69,10 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       request.set("copyPaste/source/range/endRowIndex", srcRowEnd);
       request.set("copyPaste/source/range/startColumnIndex", srcColStart);
       request.set("copyPaste/source/range/endColumnIndex", srcColEnd);
+
       if (!i) request.set("copyPaste/destination/range/sheetId", SHEET1_ID);
       else  request.set("copyPaste/destination/range/sheetId", SHEET2_ID);
+
       request.set("copyPaste/destination/range/startRowIndex", dstRowStart);
       request.set("copyPaste/destination/range/startColumnIndex", dstColStart);
       request.set("copyPaste/pasteType", "PASTE_NORMAL");
@@ -71,6 +82,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
       if (!i) request.set("repeatCell/range/sheetId", SHEET1_ID);
       else request.set("repeatCell/range/sheetId", SHEET2_ID);
+
       request.set("repeatCell/range/startRowIndex", clearRowStart);
       request.set("repeatCell/range/endRowIndex", clearRowEnd);
       request.set("repeatCell/range/startColumnIndex", clearColStart);
@@ -83,7 +95,6 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
       response.clear();
-
       requests.clear();
     }
   }
