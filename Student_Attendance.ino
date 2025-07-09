@@ -923,12 +923,12 @@ void setup() {
   ArduinoOTA.setPassword(OTA_PASS);
   ArduinoOTA.begin();
 
+  for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе самым изощренным способом
+
   menu.start_page(0);       //чисто для обновления времени
   list.begin();
   menu.start_page(1);       //вот тут уже достраиваем стартовую страницу окончательно
   checkYear();
-
-  for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе
 }
 
 void loop() {

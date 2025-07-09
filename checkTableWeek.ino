@@ -32,77 +32,103 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
+  bot.sendMessage("Нужно достроить: " + String(weeksToBuild), Admins[0]);
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  
-  byte tableLen[4] = {};        //длина таблицы для 2 подгрупп для 2 вариантов четности
+  byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
 
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
 
     if (!week[2+i].pon_day) {         //если структура не содержит данных - заполняем
-        String range = "";
-        if (!i) range += Sheet1;
-        else range += Sheet2;
-        range += weekInfo_c;
-        range += (weekInfo_i + (offset[i]*(week_off-2)));
-        range += ":";
-        range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i]*(week_off-2)));
-        Text answer(list.getCells(range));
-        list.getBriefCellData(&week[2+i], answer);
+      String range = "";
+      if (!i) range += Sheet1;
+      else range += Sheet2;
+      range += weekInfo_c;
+      range += (weekInfo_i + (offset[i]*(week_off-2)));
+      range += ":";
+      range += charOffset(String(weekInfo_c), 1);
+      range += (weekInfo_i + (offset[i]*(week_off-2)));
+      Text answer(list.getCells(range));
+      list.getBriefCellData(&week[2+i], answer);
+    }
+
+    for (byte k = 0; k < 2; k++) {
+      bool prev = false;
+      for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
+        if (week[i+2*k].subj_num[s] == 0) continue;
+        if (prev) tableLen[k] += 1;
+        tableLen[k] += week[i+2*k].subj_num[s];
+        prev = true;
+      }
     }
 
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
 
-      int srcColEnd = 3;           //столбец конца диапазона копирования
-      int dstRowStart = 0, dstColStart = 5;         //строка и столбец ячейки вставки скопированного диапазона
-
-      int clearRowStart = 2, clearRowEnd = 4;       //строки начала и конца диапазона очистки
-      int clearColStart = 5, clearColEnd = 8;       //столбцы начала и конца диапазона очистки
-
       FirebaseJsonArray requests;
       FirebaseJson request;
-      
-      if (!i) request.set("copyPaste/source/range/sheetId", SHEET1_ID);
-      else  request.set("copyPaste/source/range/sheetId", SHEET2_ID);
 
-      request.set("copyPaste/source/range/startRowIndex", (weekInfo_i + (offset[i]*(week_off-2+iter)))) - 1;
-      request.set("copyPaste/source/range/endRowIndex", (people_list_i + (offset[i]*(week_off-2+iter))) + people_in_subgr[i]) - 1;
-      request.set("copyPaste/source/range/startColumnIndex", columnLetterToIndex(charOffset(weekInfo_c, -1)));
-      request.set("copyPaste/source/range/endColumnIndex", srcColEnd);
+      bot.sendMessage("Начинаю сборку листа " + String(iter) + "/" + String(i+1) + ", HEAP: " + String(ESP.getFreeHeap()), Admins[0]);
 
-      if (!i) request.set("copyPaste/destination/range/sheetId", SHEET1_ID);
-      else  request.set("copyPaste/destination/range/sheetId", SHEET2_ID);
+      if (!i)
+        request.set("copyPaste/source/sheetId", SHEET1_ID);
+      else
+        request.set("copyPaste/source/sheetId", SHEET2_ID);
 
-      request.set("copyPaste/destination/range/startRowIndex", dstRowStart);
-      request.set("copyPaste/destination/range/startColumnIndex", dstColStart);
+      request.set("copyPaste/source/startRowIndex", (weekInfo_i + (offset[i] * (week_off - 2 + iter))) - 1);
+      request.set("copyPaste/source/endRowIndex", (people_list_i + (offset[i] * (week_off - 2 + iter)) + people_in_subgr[i] - 2));
+      request.set("copyPaste/source/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
+      request.set("copyPaste/source/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
+
+      if (!i)
+        request.set("copyPaste/destination/sheetId", SHEET1_ID);
+      else
+        request.set("copyPaste/destination/sheetId", SHEET2_ID);
+
+      request.set("copyPaste/destination/startRowIndex", (weekInfo_i + (offset[i] * (week_off + iter)) - 1));
+      request.set("copyPaste/destination/endRowIndex", (people_list_i + (offset[i] * (week_off + iter)) + people_in_subgr[i] - 2));
+      request.set("copyPaste/destination/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
+      request.set("copyPaste/destination/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
+
       request.set("copyPaste/pasteType", "PASTE_NORMAL");
-    
+
       requests.add(request);
       request.clear();
 
-      if (!i) request.set("repeatCell/range/sheetId", SHEET1_ID);
-      else request.set("repeatCell/range/sheetId", SHEET2_ID);
+      // REPEATCELL — очистка ячеек
+      if (!i)
+        request.set("repeatCell/range/sheetId", SHEET1_ID);
+      else
+        request.set("repeatCell/range/sheetId", SHEET2_ID);
 
-      request.set("repeatCell/range/startRowIndex", clearRowStart);
-      request.set("repeatCell/range/endRowIndex", clearRowEnd);
-      request.set("repeatCell/range/startColumnIndex", clearColStart);
-      request.set("repeatCell/range/endColumnIndex", clearColEnd);
+      request.set("repeatCell/range/startRowIndex", (people_list_i + (offset[i] * (week_off + iter))) - 1);
+      request.set("repeatCell/range/endRowIndex", (people_list_i + (offset[i] * (week_off + iter)) + people_in_subgr[i] - 2));
+      request.set("repeatCell/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
+      request.set("repeatCell/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
+
       request.set("repeatCell/cell/userEnteredValue/stringValue", "");
       request.set("repeatCell/fields", "userEnteredValue");
+
       requests.add(request);
       request.clear();
+
+      bot.sendMessage("MIN FREE HEAP: " + String(ESP.getFreeHeap()), Admins[0]);
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
+
+      String responseStr;
+      requests.toString(responseStr, true); // true — делает JSON читаемым (форматированным)
+      bot.sendMessage(responseStr, Admins[0]);
+
       response.clear();
       requests.clear();
+      
+      return 0;
     }
   }
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   EEPROM_PUT(0, week_off);
   return weeksToBuild;
-  return 0;
 }
 
 uint16_t columnLetterToIndex(const String& col) {         //конвертация буквенной части адреса ячейки в абсолютное числовое значение (такой формат требует batchUpdate)
