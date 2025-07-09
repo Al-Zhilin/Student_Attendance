@@ -29,10 +29,12 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     }
     days_between += realTime.day;
     weeksToBuild = days_between / 7;
+    bot.sendMessage(String(days_between), Admins[0]);
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
   bot.sendMessage("Нужно достроить: " + String(weeksToBuild), Admins[0]);
+  
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
@@ -55,9 +57,9 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     for (byte k = 0; k < 2; k++) {
       bool prev = false;
       for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (week[i+2*k].subj_num[s] == 0) continue;
+        if (week[i+2*k].subj_num[s] == 0) continue; 
         if (prev) tableLen[k] += 1;
-        tableLen[k] += week[i+2*k].subj_num[s];
+        tableLen[k] += week[i+2*k].subj_num[s];       //---------------------------------------------ПЕРЕПИСАТЬ БЕЗ СОЗДАНИЯ НОВЫХ WEEK!!!!------------------------------------------------------------
         prev = true;
       }
     }
@@ -110,13 +112,25 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       requests.add(request);
       request.clear();
 
+      /*if (!i)
+        request.set("updateCells/range/sheetId", SHEET1_ID);
+      else
+        request.set("updateCells/range/sheetId", SHEET2_ID);
+      
+      request.set("updateCells/range/startRowIndex", );
+      request.set("updateCells/range/endRowIndex");
+      request.set("updateCells/range/startColumnIndex", );
+      request.set("updateCells/range/endColumnIndex");
+      request.set("updateCells/raws/");
+      */
+
       bot.sendMessage("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
 
       String responseStr;
-      requests.toString(responseStr, true); // true — делает JSON читаемым (форматированным)
+      requests.toString(responseStr, true);
       bot.sendMessage(responseStr, Admins[0]);
 
       response.clear();

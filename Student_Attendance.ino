@@ -108,9 +108,7 @@ struct WeekInfo {
   byte *less_nums[7] = {};        //номера всех пар в дне
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
 
-} week[4];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы. 3 и 4 - соответственно для другой четности недели
-                //Логика здесь такая: заранее выделяем память под обьекты с данными о неделях другой четности, но не тратим время в list.begin на получение данных.
-                //Лишь при надобности достроения недель будем заполнять эти обьекты в checkTableWeek
+} week[2];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
 
 struct CoutntInfo {
   String surn;
@@ -238,7 +236,7 @@ class Sheet {
         range += charOffset(String(weekInfo_c), 1);
         range += (weekInfo_i + (offset[i]*(week_off-1)));
         Text answer(this->getCells(range));
-        this->getBriefCellData(&week[i], answer);              //упоковал эту процедуру в функцию - для сокращения кода в построеннии новых недель в таблице будет полезно
+        this->getBriefCellData(&week[i], answer);              //упоковал эту процедуру в функцию - для сокращения кода здесь и возможности повторного использования где-нибудь потом
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
         
 
@@ -246,7 +244,6 @@ class Sheet {
         Text ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
         
         String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта фигня №1
-        firstDayName.toLowerCase();
         
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
@@ -255,15 +252,15 @@ class Sheet {
             else if (iter == 1)  week[i].pon_month = (week[i].pon_month * 10 + cell[q] - '0');
           }
         }
-        
-        if (firstDayName != "понедельник") {                  //непонятно, нужна ли эта фигня №2
-          if (firstDayName == "вторник")  week[i].pon_day--;
-          else if (firstDayName == "среда") week[i].pon_day-=2;
-          else if (firstDayName == "четверг") week[i].pon_day-=3;
-          else if (firstDayName == "пятница") week[i].pon_day-=4;
-          else if (firstDayName == "суббота") week[i].pon_day-=5;
-          else if (firstDayName == "воскресенье") week[i].pon_day-=6;
-          else bot.sendMessage(F("[!CRITICAL] Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели!"));
+        bot.sendMessage(String(week[i].pon_month), Admins[0]);
+        if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2
+          if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i].pon_day--;
+          else if (firstDayName == "среда" || firstDayName == "Среда") week[i].pon_day-=2;
+          else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i].pon_day-=3;
+          else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i].pon_day-=4;
+          else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i].pon_day-=5;
+          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i].pon_day-=6;
+          else bot.sendMessage(F("[!CRITICAL] Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели!"), Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
 
