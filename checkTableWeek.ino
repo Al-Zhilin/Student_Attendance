@@ -67,7 +67,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJsonArray requests;
       FirebaseJson request;
 
-      bot.sendMessage("Начинаю сборку листа " + String(iter) + "/" + String(i+1) + ", HEAP: " + String(ESP.getFreeHeap()), Admins[0]);
+      bot.sendMessage("Начинаю сборку листа " + String(iter) + "/" + String(i+1) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
 
       if (!i)
         request.set("copyPaste/source/sheetId", SHEET1_ID);
@@ -94,7 +94,6 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       requests.add(request);
       request.clear();
 
-      // REPEATCELL — очистка ячеек
       if (!i)
         request.set("repeatCell/range/sheetId", SHEET1_ID);
       else
@@ -111,7 +110,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       requests.add(request);
       request.clear();
 
-      bot.sendMessage("MIN FREE HEAP: " + String(ESP.getFreeHeap()), Admins[0]);
+      bot.sendMessage("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
@@ -123,7 +122,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       response.clear();
       requests.clear();
       
-      return 0;
+      if (iter) return 0;
     }
   }
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
