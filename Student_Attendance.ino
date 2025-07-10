@@ -144,7 +144,7 @@ class DeleteTimer {
 
   public:
   void add(int32_t message_id, uint16_t period) {
-    if (timer_size+1 > 255)  return;                   //проверка на переполнения счетчика сообщений, обрабатываемых тайммером
+    if (timer_size+1 > 255)  return;                   //проверка на переполнения счетчика сообщений, обрабатываемых таймером
 
     timer_data *temp = (timer_data *)realloc(ptr, (++timer_size)*sizeof(timer_data));           //выделяем память под данные нового таймера
     if (temp == nullptr)  return;                 //проверка на успешность перераспределения памяти
@@ -236,12 +236,32 @@ class Sheet {
         range += charOffset(String(weekInfo_c), 1);
         range += (weekInfo_i + (offset[i]*(week_off-1)));
         Text answer(this->getCells(range));
-        this->getBriefCellData(&week[i], answer);              //упоковал эту процедуру в функцию - для сокращения кода здесь и возможности повторного использования где-нибудь потом
+        Text ans = answer.getSub(r_count, "\"");
+
+        for (byte iter = 0; iter < ans.count("/"); iter++) {
+          ans.getSub(iter, "/").toString(get_cell);
+          get_cell.toLowerCase();
+          Text cell(get_cell);
+          if (!iter)  {
+            if (cell == "числитель") week[i].parity = false;
+            else week[i].parity = true;
+          }
+
+          else if (iter == 1) {
+            week[i].study_days = cell.toInt();
+          }
+
+          else { 
+            if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
+            week[i].subj_num[iter-2] = cell.toInt();
+            week[i].less_nums[iter-2] = new byte[week[i].subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
+          }
+        }
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
         
 
         //----------------------Дата понедельника этой недели---------------------------
-        Text ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
+        ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
         
         String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта фигня №1
         
@@ -318,28 +338,25 @@ class Sheet {
       checkTableWeek();        //после вытягивания всех данных проверяем их на валидность текущей дате
     }
 
-    void getBriefCellData(WeekInfo *some_week, Text answer) {           //разбирает ячейку с сокращенной информацией о неделе в структуру WeekInfo
+    void BriefCellToArray(byte *subj_num, byte size, Text answer) {                      //разбирает ячейку с сокращенной информацией о неделе, достает оттуда только масив с колличеством пар в дне и пихает эти данные в массив
+      if (size != 7)  {
+        bot.sendMessage(F("SIZE!=7 in getBriefCellData! Error!"));
+        return;
+      }
+
       Text ans = answer.getSub(r_count, "\"");
       String get_cell = "";
       for (byte iter = 0; iter < ans.count("/"); iter++) {
         ans.getSub(iter, "/").toString(get_cell);
         get_cell.toLowerCase();
         Text cell(get_cell);
-        if (!iter)  {
-          if (cell == "числитель") some_week->parity = false;
-          else some_week->parity = true;
-        }
-
-        else if (iter == 1) {
-          some_week->study_days = cell.toInt();
-        }
-
-        else { 
+        
+        if (iter > 1) {
           if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
-          some_week->subj_num[iter-2] = cell.toInt();
-          some_week->less_nums[iter-2] = new byte[some_week->subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
+          subj_num[iter-2] = cell.toInt();
         }
       }
+
     }
 
     String getCells(String range) {

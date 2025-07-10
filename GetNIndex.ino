@@ -1,5 +1,4 @@
 void getNIndex(bool subgr) {
-  //FB_Time t = bot.getTime(3);
   byte weeks_ago = 0, days_ago = 0;
   int diff = 0;
   
@@ -23,7 +22,7 @@ void getNIndex(bool subgr) {
 
   else if (nka.month < week[subgr].pon_month) {
     int d = 0;
-    for (byte i = nka.month+1; i < week[subgr].pon_month; i++) {  // Начинаем с nka.month, а не nka.month+1.
+    for (byte i = nka.month+1; i < week[subgr].pon_month; i++) {
       d += day_month[i - 1];
     }
     diff = (week[subgr].pon_day + day_month[nka.month-1]) - nka.day + d;
@@ -57,7 +56,7 @@ void getNIndex(bool subgr) {
   for (int i = 0; i < days_ago; i++) {
     if (week[subgr].subj_num[i] == 0) continue;
 
-    if (prev) sm++;          // разделитель между непустыми днями
+    if (prev) sm++;
     else prev = true;
 
     sm += week[subgr].subj_num[i];

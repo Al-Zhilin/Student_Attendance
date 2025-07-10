@@ -38,21 +38,22 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
+  byte subj_num[7] = {255};
 
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
 
-    if (!week[2+i].pon_day) {         //если структура не содержит данных - заполняем
-      String range = "";
-      if (!i) range += Sheet1;
-      else range += Sheet2;
-      range += weekInfo_c;
-      range += (weekInfo_i + (offset[i]*(week_off-2)));
-      range += ":";
-      range += charOffset(String(weekInfo_c), 1);
-      range += (weekInfo_i + (offset[i]*(week_off-2)));
-      Text answer(list.getCells(range));
-      list.getBriefCellData(&week[2+i], answer);
-    }
+    //-------Получаем данные о парах кахдого дня недели противоположной настоящей четности для каждой подгруппы (нужно для tableLen и дальнейшего заполнения)
+    String range = "";
+    if (!i) range += Sheet1;
+    else range += Sheet2;
+    range += weekInfo_c;
+    range += (weekInfo_i + (offset[i]*(week_off-2)));
+    range += ":";
+    range += charOffset(String(weekInfo_c), 1);
+    range += (weekInfo_i + (offset[i]*(week_off-2)));
+    Text answer(list.getCells(range));
+    list.BriefCellToArray(subj_num, sizeof(subj_num)/sizeof(subj_num[0]), answer);
+    
 
     for (byte k = 0; k < 2; k++) {
       bool prev = false;
@@ -68,6 +69,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
       FirebaseJsonArray requests;
       FirebaseJson request;
+      FirebaseJson rows;
 
       bot.sendMessage("Начинаю сборку листа " + String(iter) + "/" + String(i+1) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
 
@@ -112,17 +114,22 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       requests.add(request);
       request.clear();
 
-      /*if (!i)
+      if (!i)
         request.set("updateCells/range/sheetId", SHEET1_ID);
       else
         request.set("updateCells/range/sheetId", SHEET2_ID);
       
-      request.set("updateCells/range/startRowIndex", );
+      /*request.set("updateCells/range/startRowIndex", );
       request.set("updateCells/range/endRowIndex");
       request.set("updateCells/range/startColumnIndex", );
-      request.set("updateCells/range/endColumnIndex");
-      request.set("updateCells/raws/");
-      */
+      request.set("updateCells/range/endColumnIndex", );
+
+      for (byte j = 0; j < 7; j++) {
+        
+      }
+
+      request.set("updateCells/rows", rows);
+      request.set("updateCells/fields", "userEnteredValue");*/
 
       bot.sendMessage("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
 
