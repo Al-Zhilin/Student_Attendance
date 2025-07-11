@@ -459,7 +459,7 @@ class Menu {
       }
     }
 
-    void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщения
+    void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщени
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         bot.editMessage(status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
       }

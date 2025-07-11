@@ -38,7 +38,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
   byte subj_num[7] = {255};
-
+  /*
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
 
     //-------Получаем данные о парах кахдого дня недели противоположной настоящей четности для каждой подгруппы (нужно для tableLen и дальнейшего заполнения)
@@ -70,7 +70,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJson request;
       FirebaseJson rows;
 
-      menu.editServiceMess("Начинаю сборку листа " + String(iter) + "/" + String(weeksToBuild) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
+      menu.editServiceMessadd("Начинаю сборку листа " + String(iter) + "/" + String(weeksToBuild) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
       if (!i)
         request.set("copyPaste/source/sheetId", SHEET1_ID);
@@ -118,7 +118,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       else
         request.set("updateCells/range/sheetId", SHEET2_ID);
       
-      /*request.set("updateCells/range/startRowIndex", );
+      request.set("updateCells/range/startRowIndex", );
       request.set("updateCells/range/endRowIndex");
       request.set("updateCells/range/startColumnIndex", );
       request.set("updateCells/range/endColumnIndex", );
@@ -128,7 +128,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       }
 
       request.set("updateCells/rows", rows);
-      request.set("updateCells/fields", "userEnteredValue");*/
+      request.set("updateCells/fields", "userEnteredValue");
 
       menu.editServiceMess("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
@@ -144,9 +144,10 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       
       if (iter) break;
     }
-  }
+  }*/
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   EEPROM_PUT(0, week_off);
+  menu.editServiceMess("");
   return weeksToBuild;
 }
 
