@@ -10,10 +10,17 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   byte pulled_day = week[0].pon_day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
+  byte pulled_month = week[0].pon_month;
+
+  if (pulled_day > day_month[pulled_month-1]) {
+    pulled_day -= day_month[pulled_month-1];
+    pulled_month++;
+  }
+
   byte weeksToBuild = 0;
 
-  if (week[0].pon_month == realTime.month) {       //если месяцы одинаковые
-    if (realTime.day - pulled_day == 0) {
+  if (pulled_month == realTime.month) {       //если месяцы одинаковые
+    if (realTime.day == pulled_day) {
       return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!
     }
 
@@ -22,18 +29,20 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     }
   }
 
-  else {                                                            //рассчитываем количество дней, а в последствии недель, которые нужно достроить в случае, когда месяца дат не равны
-    int days_between = day_month[week[0].pon_month-1] - pulled_day;
-    for (byte i = 1; i < realTime.month - week[i].pon_month; i++) {
-      days_between += day_month[week[i].pon_month+i-1];
+  else {
+    int days_between = day_month[pulled_month - 1] - pulled_day;
+
+    for (byte i = pulled_month; i < realTime.month - 1; i++) {
+      days_between += day_month[i];
     }
+
     days_between += realTime.day;
     weeksToBuild = days_between / 7;
+    if (days_between % 7 != 0)  bot.sendMessage(F("WARNING! days_between % 7 != 0!"), Admins[0]);
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
-  menu.editServiceMess("Нужно достроить: " + String(weeksToBuild));
-  
+  menu.editServiceMess("Нужно достроить недель: " + String(weeksToBuild));
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
@@ -135,9 +144,9 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
 
-      /*String responseStr;
+      String responseStr;
       requests.toString(responseStr, true);                 Вывод для отладки
-      bot.sendMessage(responseStr, Admins[0]);*/
+      bot.sendMessage(responseStr, Admins[0]);
 
       response.clear();
       requests.clear();
@@ -147,7 +156,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   }*/
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   EEPROM_PUT(0, week_off);
-  menu.editServiceMess("");
+  //menu.editServiceMess("");
   return weeksToBuild;
 }
 
