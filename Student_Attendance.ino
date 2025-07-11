@@ -272,7 +272,7 @@ class Sheet {
             else if (iter == 1)  week[i].pon_month = (week[i].pon_month * 10 + cell[q] - '0');
           }
         }
-        bot.sendMessage(String(week[i].pon_month), Admins[0]);
+
         if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2
           if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i].pon_day--;
           else if (firstDayName == "среда" || firstDayName == "Среда") week[i].pon_day-=2;
@@ -432,6 +432,7 @@ class Sheet {
 class Menu {
   private:
     int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};
+    int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
     String s_menu[2] = {"Редактировать", "Подсчитать"};
@@ -444,6 +445,7 @@ class Menu {
       if (!mode)  {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
           bot.sendMessage("______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[i]);
+          status_mess[i] = bot.lastBotMsg();
         }
         return;
       }
@@ -454,6 +456,12 @@ class Menu {
           bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1], Admins[i]);
           menu_id[i] = bot.lastBotMsg();
         }
+      }
+    }
+
+    void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщения
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+        bot.editMessage(status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
       }
     }
 

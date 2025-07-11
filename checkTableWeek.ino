@@ -29,11 +29,10 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     }
     days_between += realTime.day;
     weeksToBuild = days_between / 7;
-    bot.sendMessage(String(days_between), Admins[0]);
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
-  bot.sendMessage("Нужно достроить: " + String(weeksToBuild), Admins[0]);
+  menu.editServiceMess("Нужно достроить: " + String(weeksToBuild));
   
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
@@ -58,9 +57,9 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     for (byte k = 0; k < 2; k++) {
       bool prev = false;
       for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (week[i+2*k].subj_num[s] == 0) continue; 
+        if (((!k) ? week[i].subj_num[s] : subj_num[s]) == 0) continue; 
         if (prev) tableLen[k] += 1;
-        tableLen[k] += week[i+2*k].subj_num[s];       //---------------------------------------------ПЕРЕПИСАТЬ БЕЗ СОЗДАНИЯ НОВЫХ WEEK!!!!------------------------------------------------------------
+        tableLen[k] += ((!k) ? week[i].subj_num[s] : subj_num[s]);
         prev = true;
       }
     }
@@ -71,7 +70,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJson request;
       FirebaseJson rows;
 
-      bot.sendMessage("Начинаю сборку листа " + String(iter) + "/" + String(i+1) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
+      menu.editServiceMess("Начинаю сборку листа " + String(iter) + "/" + String(weeksToBuild) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
       if (!i)
         request.set("copyPaste/source/sheetId", SHEET1_ID);
@@ -131,19 +130,19 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       request.set("updateCells/rows", rows);
       request.set("updateCells/fields", "userEnteredValue");*/
 
-      bot.sendMessage("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()), Admins[0]);
+      menu.editServiceMess("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
 
-      String responseStr;
-      requests.toString(responseStr, true);
-      bot.sendMessage(responseStr, Admins[0]);
+      /*String responseStr;
+      requests.toString(responseStr, true);                 Вывод для отладки
+      bot.sendMessage(responseStr, Admins[0]);*/
 
       response.clear();
       requests.clear();
       
-      if (iter) return 0;
+      if (iter) break;
     }
   }
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
