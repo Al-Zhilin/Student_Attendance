@@ -1,6 +1,16 @@
 uint8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
   FB_Time realTime = bot.getTime(3);                            //структура реального времени
 
+  String DaysOfWeek[7] {
+    "Понедельник",
+    "Вторник",
+    "Среда",
+    "Четверг",
+    "Пятница",
+    "Суббота",
+    "Воскресенье",
+  }
+
   //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
   if (realTime.day == 0) {
@@ -46,8 +56,8 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
-  byte subj_num[7] = {255};
-  /*
+  byte subj_num[7] = {};
+  
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
 
     //-------Получаем данные о парах кахдого дня недели противоположной настоящей четности для каждой подгруппы (нужно для tableLen и дальнейшего заполнения)
@@ -60,13 +70,13 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     range += charOffset(String(weekInfo_c), 1);
     range += (weekInfo_i + (offset[i]*(week_off-2)));
     Text answer(list.getCells(range));
-    list.BriefCellToArray(subj_num, sizeof(subj_num)/sizeof(subj_num[0]), answer);
+    list.BriefCellToArray(subj_num, sizeof(subj_num)/sizeof(subj_num[0]), answer);          //функция заполняет массив subj_num нужными данными из ячейки
     
 
-    for (byte k = 0; k < 2; k++) {
+    for (byte k = 0; k < 2; k++) {              //ищем 2 длины - для каждой четности недели у подгруппы i
       bool prev = false;
-      for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (((!k) ? week[i].subj_num[s] : subj_num[s]) == 0) continue; 
+      for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
+        if (((!k) ? week[i].subj_num[s] : subj_num[s]) == 0) continue;
         if (prev) tableLen[k] += 1;
         tableLen[k] += ((!k) ? week[i].subj_num[s] : subj_num[s]);
         prev = true;
@@ -126,14 +136,26 @@ uint8_t checkTableWeek() {            //функция проверки и до�
         request.set("updateCells/range/sheetId", SHEET1_ID);
       else
         request.set("updateCells/range/sheetId", SHEET2_ID);
-      
+      /*
       request.set("updateCells/range/startRowIndex", );
       request.set("updateCells/range/endRowIndex");
       request.set("updateCells/range/startColumnIndex", );
       request.set("updateCells/range/endColumnIndex", );
+      */
 
+      String Value = "";
+      bool prev = false;
       for (byte j = 0; j < 7; j++) {
+        if (!((iter % 2) ? week[i].subj_num[j] : subj_num[j])) continue;             //если пар в этот день нет - пропускаем
+        if (prev) request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", "");
+        prev = true;
+        Value = DaysOfWeek[j];                                               //день недели
+        Value += ", ";
         
+        for (byte n = 0; n < ((iter % 2) ? week[i].subj_num[j] : subj_num[j]); n++) {
+          if (!n) request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", Value);
+          else request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", "");
+        }
       }
 
       request.set("updateCells/rows", rows);
@@ -144,19 +166,21 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
 
+      /*
       String responseStr;
-      requests.toString(responseStr, true);                 Вывод для отладки
+      requests.toString(responseStr, true);                 //Вывод для отладки
       bot.sendMessage(responseStr, Admins[0]);
+      */
 
       response.clear();
       requests.clear();
       
       if (iter) break;
     }
-  }*/
+  }
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  EEPROM_PUT(0, week_off);
-  //menu.editServiceMess("");
+  //EEPROM_PUT(0, week_off);      Расскоментить когда доделаем функцию
+  menu.editServiceMess("");
   return weeksToBuild;
 }
 
@@ -170,4 +194,12 @@ uint16_t columnLetterToIndex(const String& col) {         //конвертаци
   return result - 1;
 }
 
+void sumDate(Date *date, byte day_offset) {
+  int total_day = date->day + day_offset;
 
+  while (total_day > day_month[(date->month - 1) % 12]) {           //даже с проверкой перехода нового года
+    total_day -= day_month[(date->month - 1) % 12];
+    date->month++;
+    if (date->month > 12) date->month = 1;
+  }
+}
