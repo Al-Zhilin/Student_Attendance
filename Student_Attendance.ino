@@ -278,14 +278,14 @@ class Sheet {
           }
         }
 
-        if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2
+        if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
           if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i].pon_day--;
           else if (firstDayName == "среда" || firstDayName == "Среда") week[i].pon_day-=2;
           else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i].pon_day-=3;
           else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i].pon_day-=4;
           else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i].pon_day-=5;
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i].pon_day-=6;
-          else bot.sendMessage(F("[!CRITICAL] Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели!"), Admins[0]);
+          else bot.sendMessage("[!CRITICAL] Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName + "!", Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
 

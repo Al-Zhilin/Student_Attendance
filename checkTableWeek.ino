@@ -75,6 +75,8 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
     for (byte k = 0; k < 2; k++) {              //ищем 2 длины - для каждой четности недели у подгруппы i
       bool prev = false;
+      tableLen[k] = 0;
+
       for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
         if (((!k) ? week[i].subj_num[s] : subj_num[s]) == 0) continue;
         if (prev) tableLen[k] += 1;
@@ -85,9 +87,8 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
 
-      FirebaseJsonArray requests;
-      FirebaseJson request;
-      FirebaseJson rows;
+      FirebaseJsonArray requests;     //массив запросов
+      FirebaseJson request;         //храним по очереди все запросы перед добавлением в массив запросов
 
       menu.editServiceMess("Начинаю сборку листа " + String(iter) + "/" + String(weeksToBuild) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
@@ -132,50 +133,66 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       requests.add(request);
       request.clear();
 
+      FirebaseJsonArray valuesArray;
+
       if (!i)
         request.set("updateCells/range/sheetId", SHEET1_ID);
       else
         request.set("updateCells/range/sheetId", SHEET2_ID);
-      /*
-      request.set("updateCells/range/startRowIndex", );
-      request.set("updateCells/range/endRowIndex");
-      request.set("updateCells/range/startColumnIndex", );
-      request.set("updateCells/range/endColumnIndex", );
-      */
+      
+      request.set("updateCells/range/startRowIndex", (weekInfo_i + (offset[i] * (week_off + iter)) - 1));
+      request.set("updateCells/range/endRowIndex", (weekInfo_i + (offset[i] * (week_off + iter))));
+      request.set("updateCells/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
+      request.set("updateCells/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
 
       String Value = "";
       bool prev = false;
+      byte pos = 0;
+      Date dateToWeek;
+      dateToWeek.day = week[0].pon_day;
+      dateToWeek.month = week[0].pon_month;
+
       for (byte j = 0; j < 7; j++) {
         byte numSubjects = (iter % 2) ? week[i].subj_num[j] : subj_num[j];        //введем для читаемости
 
         if (!numSubjects) continue;             //если пар в этот день нет - пропускаем
-        if (prev) request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", "");
+        if (prev) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
         prev = true;
         Value = DaysOfWeek[j];                                               //день недели
         Value += ", ";
-        Date dateToWeek;
-        dateToWeek.day = week[0].pon_day;
-        dateToWeek.month = week[0].pon_month;
-        sumDate(&dateToWeek, 7*(iter+1));
+        sumDate(&dateToWeek, 7);
+        Value += dateToWeek.day;
+        Value += ".";
+        Value += dateToWeek.month;
+        
         for (byte n = 0; n < numSubjects; n++) {
-          if (!n) request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", Value);
-          else request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", "");
+          if (!n) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", Value));
+          else valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
         }
+        pos++;
       }
 
-      request.set("updateCells/rows", rows);
+      FirebaseJson rowObject;
+      rowObject.set("values", valuesArray);
+
+      FirebaseJsonArray rowsArray;
+      rowsArray.add(rowObject);
+
+      request.set("updateCells/rows", rowsArray);
       request.set("updateCells/fields", "userEnteredValue");
+      requests.add(request);
+      request.clear();
 
       menu.editServiceMess("MIN FREE HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
 
-      /*
+      
       String responseStr;
-      requests.toString(responseStr, true);                 //Вывод для отладки
+      requests.toString(responseStr, true);                 //Вывод ответа Google Sheets API для отладки
       bot.sendMessage(responseStr, Admins[0]);
-      */
+      
 
       response.clear();
       requests.clear();
@@ -199,7 +216,7 @@ uint16_t columnLetterToIndex(const String& col) {         //конвертаци
   return result - 1;
 }
 
-void sumDate(Date *date, byte day_offset) {
+void sumDate(Date *date, byte day_offset) {              //функция суммирования стурктуры Date с неким числом дней. Изменяет напрямую переданный обьект
   int total_day = date->day + day_offset;
 
   while (total_day > day_month[(date->month - 1) % 12]) {           //даже с проверкой перехода нового года
