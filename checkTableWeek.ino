@@ -1,7 +1,7 @@
 uint8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
   FB_Time realTime = bot.getTime(3);                            //структура реального времени
 
-  String DaysOfWeek[7] {
+  String DaysOfWeek[7] = {
     "Понедельник",
     "Вторник",
     "Среда",
@@ -9,7 +9,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     "Пятница",
     "Суббота",
     "Воскресенье",
-  }
+  };
 
   //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
@@ -89,7 +89,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       FirebaseJson request;
       FirebaseJson rows;
 
-      menu.editServiceMessadd("Начинаю сборку листа " + String(iter) + "/" + String(weeksToBuild) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
+      menu.editServiceMess("Начинаю сборку листа " + String(iter) + "/" + String(weeksToBuild) + ", HEAP: " + String(ESP.getFreeHeap()) + "/" + String(ESP.getHeapSize()));
 
       if (!i)
         request.set("copyPaste/source/sheetId", SHEET1_ID);
@@ -146,13 +146,18 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       String Value = "";
       bool prev = false;
       for (byte j = 0; j < 7; j++) {
-        if (!((iter % 2) ? week[i].subj_num[j] : subj_num[j])) continue;             //если пар в этот день нет - пропускаем
+        byte numSubjects = (iter % 2) ? week[i].subj_num[j] : subj_num[j];        //введем для читаемости
+
+        if (!numSubjects) continue;             //если пар в этот день нет - пропускаем
         if (prev) request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", "");
         prev = true;
         Value = DaysOfWeek[j];                                               //день недели
         Value += ", ";
-        
-        for (byte n = 0; n < ((iter % 2) ? week[i].subj_num[j] : subj_num[j]); n++) {
+        Date dateToWeek;
+        dateToWeek.day = week[0].pon_day;
+        dateToWeek.month = week[0].pon_month;
+        sumDate(&dateToWeek, 7*(iter+1));
+        for (byte n = 0; n < numSubjects; n++) {
           if (!n) request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", Value);
           else request.set("updateCells/rows/[0]/values/[0]/userEnteredValue/stringValue", "");
         }
