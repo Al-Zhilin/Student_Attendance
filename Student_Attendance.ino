@@ -53,6 +53,7 @@ byte week_off = 13;                                                             
 bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
+int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};       //пока не придумал, как грумотно скрыть и использовать, не обьявляя прототипы классов. Пускай побудет так :)
 
 const String months[] = {
   "Янв",
@@ -88,6 +89,17 @@ struct Date {
   byte day = 0;
   byte month = 0; 
 };
+
+String PROGMEM DaysOfWeek[] = {
+  "Понедельник",
+  "Вторник",
+  "Среда",
+  "Четверг",
+  "Пятница",
+  "Суббота",
+  "Воскресенье",
+};
+
 
 struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки
   String surn;          //фамилия человека
@@ -135,6 +147,7 @@ void checkYear() {
   }
   else day_month[1] = 28;
 }
+
 
 struct timer_data {
   uint32_t start_millis = 0;
@@ -218,6 +231,8 @@ class Sheet {
       GSheet.setPrerefreshSeconds(10 * 60);
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
 
+      editServiceMess("Подключаюсь к Google Sheet API...");
+
       uint32_t reset_timer = millis();
       digitalWrite(2, true);
       while (!(this->ready()))  {
@@ -228,6 +243,9 @@ class Sheet {
       } 
       digitalWrite(2, false);
 
+      editServiceMess("Google Sheet API успешно подключено!");
+      checkTableWeek();                                                 //проверяем неделю на актуальность
+      editServiceMess("Получаю информацию о текушей неделе...");
       
       for (byte i = 0; i < 2; i++) {
         String get_cell = "", range = "";
@@ -285,7 +303,7 @@ class Sheet {
           else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i].pon_day-=4;
           else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i].pon_day-=5;
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i].pon_day-=6;
-          else bot.sendMessage("[!CRITICAL] Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName + "!", Admins[0]);
+          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName + "!", Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
 
@@ -339,11 +357,9 @@ class Sheet {
         }*/
         //-----------------------Получение номеров всех пар-----------------------------
       }
-
-      checkTableWeek();        //после вытягивания всех данных проверяем их на валидность текущей дате
     }
 
-    void BriefCellToArray(byte *subj_num, byte size, Text answer) {                      //разбирает ячейку с сокращенной информацией о неделе, достает оттуда только масив с колличеством пар в дне и пихает эти данные в массив
+    void BriefCellToArray(byte *subj_num, byte *parsed_day, byte *parsed_month, byte size, Text answer) {                      //разбирает ячейку с сокращенной информацией о неделе, достает оттуда масив с колличеством пар в дне и дату понедельника и пихает эти данные в соответствующие переменные
       if (size != 7)  {
         bot.sendMessage(F("SIZE!=7 in getBriefCellData! Error!"));
         return;
@@ -351,6 +367,7 @@ class Sheet {
 
       Text ans = answer.getSub(r_count, "\"");
       String get_cell = "";
+
       for (byte iter = 0; iter < ans.count("/"); iter++) {
         ans.getSub(iter, "/").toString(get_cell);
         get_cell.toLowerCase();
@@ -362,6 +379,16 @@ class Sheet {
         }
       }
 
+      if (!parsed_day) {                                                        //если переменные еще не заполнены (гениальная логика для упрощения использования этой функции в checkTableWeek)
+        ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
+        for (byte iter = 0; iter < ans.count("."); iter++)  {
+          Text cell = ans.getSub(iter, ".");
+          for (byte q = 0; q < cell.length(); q++) {
+            if (iter == 0)  *parsed_day = (*parsed_day * 10 + cell[q] - '0');
+            else if (iter == 1)  *parsed_month = (*parsed_month * 10 + cell[q] - '0');
+          }
+        }
+      }
     }
 
     String getCells(String range) {
@@ -437,7 +464,6 @@ class Sheet {
 class Menu {
   private:
     int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};
-    int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
     String s_menu[2] = {"Редактировать", "Подсчитать"};
@@ -464,11 +490,7 @@ class Menu {
       }
     }
 
-    void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщения
-      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMessage(status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
-      }
-    }
+    friend void editServiceMess(String edit_text);              //функция редактирования "статусного" сообщения
 
     void menuEdit (String comm, String user) {
       FB_Time t = bot.getTime(3);
@@ -937,6 +959,12 @@ class Menu {
       }
     }
 } menu;
+
+void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщения
+  for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+    bot.editMessage(status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
+  }
+}
 
 void setup() {
   Serial.begin(115200);                                                       //последовательный порт аааткрывать

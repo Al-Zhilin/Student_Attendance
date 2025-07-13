@@ -83,7 +83,7 @@ void briefInput(Text message, String chat) {
     } 
 
     else if (faza != 4) {
-      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 24.01\"");
+      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"");
       return;
     }
   }
