@@ -245,7 +245,7 @@ class Sheet {
 
       editServiceMess("Google Sheet API успешно подключено!");
       checkTableWeek();                                                 //проверяем неделю на актуальность
-      editServiceMess("Получаю информацию о текушей неделе...");
+      editServiceMess("Получаю информацию о текущей неделе...");
       
       for (byte i = 0; i < 2; i++) {
         String get_cell = "", range = "";
@@ -303,7 +303,7 @@ class Sheet {
           else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i].pon_day-=4;
           else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i].pon_day-=5;
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i].pon_day-=6;
-          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName + "!", Admins[0]);
+          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName, Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
 
@@ -359,12 +359,8 @@ class Sheet {
       }
     }
 
-    void BriefCellToArray(byte *subj_num, byte *parsed_day, byte *parsed_month, byte size, Text answer) {                      //разбирает ячейку с сокращенной информацией о неделе, достает оттуда масив с колличеством пар в дне и дату понедельника и пихает эти данные в соответствующие переменные
-      if (size != 7)  {
-        bot.sendMessage(F("SIZE!=7 in getBriefCellData! Error!"));
-        return;
-      }
-
+    void BriefDataFromAnswer(Date *Week_data, byte *subj_num, Text answer, bool parse_date) {
+      // Шаг 1. Парсим массив subj_num  ---------------
       Text ans = answer.getSub(r_count, "\"");
       String get_cell = "";
 
@@ -372,21 +368,36 @@ class Sheet {
         ans.getSub(iter, "/").toString(get_cell);
         get_cell.toLowerCase();
         Text cell(get_cell);
-        
-        if (iter > 1) {
+
+        if (iter > 1) { 
           if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
-          subj_num[iter-2] = cell.toInt();
+          subj_num[iter-2] = cell.toInt();        //вытаскиваем количество пар в iter-2 день (iter-2 = iter начала раздело с информацией о количестве пар в конкретный день)
         }
       }
 
-      if (!parsed_day) {                                                        //если переменные еще не заполнены (гениальная логика для упрощения использования этой функции в checkTableWeek)
+
+      // Шаг 2. Вытаскивает данные для Week_data  ---------------
+      if (parse_date) {
+        Week_data->day = 0;
+        Week_data->month = 0;
         ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
+        String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта фигня №1
+        
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
           for (byte q = 0; q < cell.length(); q++) {
-            if (iter == 0)  *parsed_day = (*parsed_day * 10 + cell[q] - '0');
-            else if (iter == 1)  *parsed_month = (*parsed_month * 10 + cell[q] - '0');
+            if (iter == 0)  Week_data->day = (Week_data->day * 10 + cell[q] - '0');
+            else if (iter == 1)  Week_data->month = (Week_data->month * 10 + cell[q] - '0');
           }
+        }
+        if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
+          if (firstDayName == "вторник" || firstDayName == "Вторник")  Week_data->day--;
+          else if (firstDayName == "среда" || firstDayName == "Среда") Week_data->day-=2;
+          else if (firstDayName == "четверг" || firstDayName == "Четверг") Week_data->day-=3;
+          else if (firstDayName == "пятница" || firstDayName == "Пятница") Week_data->day-=4;
+          else if (firstDayName == "суббота"  || firstDayName == "Суббота") Week_data->day-=5;
+          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") Week_data->day-=6;
+          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName, Admins[0]);
         }
       }
     }

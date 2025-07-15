@@ -12,8 +12,25 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   }
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
-  byte pulled_day = week[0].pon_day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
-  byte pulled_month = week[0].pon_month;
+  Date dateToWeek;
+  byte subj_num[2][7] = {};
+
+  for (byte z = 0; z < 2; z++) {        //цикл получает нужные данные для данной недели и для недели прошлой четности. В данный момент для 1 подгруппы
+    String range = "";
+    range += Sheet1;
+    range += weekInfo_c;
+    range += (weekInfo_i + (offset[0]*(week_off-(z+1))));
+    if (!z) {                                                //если z == 0, значит кроме subj_num будем парсить и dateToWeek, т.к нам нужна именно дата понедельника недели НАСТОЯЩЕЙ четности
+      range += ":";
+      range += charOffset(String(weekInfo_c), 1);
+      range += (weekInfo_i + (offset[0]*(week_off-(z+1))));
+    }
+    Text answer(list.getCells(range));
+    list.BriefDataFromAnswer(&dateToWeek, subj_num[z], answer, !z);
+  }
+  
+  byte pulled_day = dateToWeek.day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
+  byte pulled_month = dateToWeek.month;
 
   if (pulled_day > day_month[pulled_month-1]) {
     pulled_day -= day_month[pulled_month-1];
@@ -46,39 +63,43 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
   editServiceMess("Нужно достроить недель: " + String(weeksToBuild));
-
+  bot.sendMessage(String(weeksToBuild), Admins[0]);
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
-  byte subj_num[2][7] = {};
   
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
-    Date dateToWeek;
+    // Получаем данные о парах кахдого дня недели противоположной и настоящей четности подгруппы (нужно для tableLen и дальнейшего заполнения)
+    for (byte z = 0; z < 2; z++) {        //цикл получает нужные данные для данной недели и для недели прошлой четности
+      if (i) {                          //получаем эти данные только для 2 подгруппы, для 1 уже получали ранее
+        String range = "";
+        range += Sheet2;
+        range += weekInfo_c;
+        range += (weekInfo_i + (offset[i]*(week_off-(z+1))));
+        if (!z) {                                                //если z == 0, значит кроме subj_num будем парсить и dateToWeek, т.к нам нужна именно дата понедельника недели НАСТОЯЩЕЙ четности
+          range += ":";
+          range += charOffset(String(weekInfo_c), 1);
+          range += (weekInfo_i + (offset[i]*(week_off-(z+1))));
+        }
+        Text answer(list.getCells(range));
+        list.BriefDataFromAnswer(&dateToWeek, subj_num[z], answer, !z);
+      }
 
-    //-------Получаем данные о парах кахдого дня недели противоположной и настоящей четности для каждой подгруппы (нужно для tableLen и дальнейшего заполнения)
-    for (byte g = 0; g < 2; g++) {
-      String range = "";
-      if (!i) range += Sheet1;
-      else range += Sheet2;
-      range += weekInfo_c;
-      range += (weekInfo_i + (offset[i]*(week_off-(g+1))));
-      range += ":";
-      range += charOffset(String(weekInfo_c), 1);
-      range += (weekInfo_i + (offset[i]*(week_off-(g+1))));
-      Text answer(list.getCells(range));
-      if (!g) list.BriefCellToArray(subj_num[0], &dateToWeek.day, &dateToWeek.month, sizeof(subj_num[0])/sizeof(subj_num[0][0]), answer);          //функция заполняет массив subj_num нужными данными из ячейки
-      else  list.BriefCellToArray(subj_num[1], &dateToWeek.day, &dateToWeek.month, sizeof(subj_num[1])/sizeof(subj_num[1][0]), answer);          //функция заполняет массив subj_num нужными данными из ячейки. По условию в функции не изменяет поля структуры
-    }
-
-    for (byte k = 0; k < 2; k++) {              //ищем 2 длины - для каждой четности недели у подгруппы i
+      // ищем 2 длины - для каждой четности недели у i подгруппы
       bool prev = false;
-      tableLen[k] = 0;
+      tableLen[z] = 0;
 
       for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (subj_num[k][s] == 0) continue;
-        if (prev) tableLen[k] += 1;
-        tableLen[k] += subj_num[k][s];
+        if (subj_num[z][s] == 0) continue;
+        if (prev) tableLen[z] += 1;
+        tableLen[z] += subj_num[z][s];
         prev = true;
       }
+    }
+
+    bot.sendMessage(String(dateToWeek.day) + "." + String(dateToWeek.month), Admins[0]);
+
+    for (byte ii = 0; ii < 7; ii++) {
+      bot.sendMessage(String(subj_num[0][ii]), Admins[0]);
     }
 
     sumDate(&dateToWeek, 6);
@@ -201,7 +222,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       editServiceMess("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String((Heap - ESP.getFreeHeap())/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
 
       FirebaseJson response;
-      //bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
+      bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
 
       /*
       String responseStr;
