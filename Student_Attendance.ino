@@ -245,7 +245,6 @@ class Sheet {
 
       editServiceMess("Google Sheet API успешно подключено!");
       checkTableWeek();                                                 //проверяем неделю на актуальность
-      editServiceMess("Получаю информацию о текущей неделе...");
       
       for (byte i = 0; i < 2; i++) {
         String get_cell = "", range = "";
@@ -356,6 +355,8 @@ class Sheet {
           bot.sendMessage("----------");
         }*/
         //-----------------------Получение номеров всех пар-----------------------------
+
+        editServiceMess("");
       }
     }
 
@@ -980,9 +981,10 @@ void editServiceMess(String edit_text) {              //функция реда�
 void setup() {
   Serial.begin(115200);                                                       //последовательный порт аааткрывать
   WiFi_Connect();                                                             //подключаемся к WiFi
+  EEPROM.begin(20);                                                           //инициализируем память для EEPROM
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  pinMode(2, OUTPUT);
+  EEPROM_START();                                                             //подтягиваем из памяти все значения
 
   bot.clearServiceMessages(true);
   ArduinoOTA.setHostname(OTA_NAME);
@@ -999,6 +1001,7 @@ void setup() {
 
 void loop() {
   static int old_year = 0;
+  static byte old_day = 0;
   bot.tick();
   timer.tick();
   ArduinoOTA.handle();
@@ -1006,5 +1009,6 @@ void loop() {
 
   if (t.year && !old_year)  old_year = t.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
   else if (old_year != t.year)  checkYear();          //Если год сменился - опа, произошел новый год, то проверяем на високосность
+  if (t.day && !old_day)  old_day = t.day;
 
 }

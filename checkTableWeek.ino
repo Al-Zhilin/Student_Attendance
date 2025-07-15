@@ -41,6 +41,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
   if (pulled_month == realTime.month) {       //если месяцы одинаковые
     if (realTime.day == pulled_day) {
+      editServiceMess("В таблице записана актуальная неделя!\nПолучаю информацию о ней...");
       return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!
     }
 
@@ -58,14 +59,18 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
     days_between += realTime.day;
     weeksToBuild = days_between / 7;
-    if (days_between % 7 != 0)  bot.sendMessage(F("WARNING! days_between % 7 != 0!"), Admins[0]);
+    if (days_between % 7 != 0)  bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!"), Admins[0]);
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
   editServiceMess("Нужно достроить недель: " + String(weeksToBuild));
-  bot.sendMessage(String(weeksToBuild), Admins[0]);
+
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
+
+  if (ESP.getFreeHeap()/1024 < 40)  {
+    bot.sendMessage(F("Критически мало свободной памяти!\nДостроение новых недель прервано!"), Admins[0]);
+  }
   
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
     // Получаем данные о парах кахдого дня недели противоположной и настоящей четности подгруппы (нужно для tableLen и дальнейшего заполнения)
@@ -94,12 +99,6 @@ uint8_t checkTableWeek() {            //функция проверки и до�
         tableLen[z] += subj_num[z][s];
         prev = true;
       }
-    }
-
-    bot.sendMessage(String(dateToWeek.day) + "." + String(dateToWeek.month), Admins[0]);
-
-    for (byte ii = 0; ii < 7; ii++) {
-      bot.sendMessage(String(subj_num[0][ii]), Admins[0]);
     }
 
     sumDate(&dateToWeek, 6);
@@ -235,8 +234,9 @@ uint8_t checkTableWeek() {            //функция проверки и до�
     }
   }
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  //EEPROM_PUT(0, week_off);      Расскоментить когда доделаем функцию
-  editServiceMess("");
+  editServiceMess("Достроено " + String(weeksToBuild) + " недель!\nПолучаю информацию о текущей неделе...");
+  week_off += weeksToBuild;
+  EEPROM_PUT(0, week_off);
   return weeksToBuild;
 }
 
