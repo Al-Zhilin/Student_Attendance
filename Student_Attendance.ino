@@ -125,7 +125,9 @@ struct WeekInfo {
   byte *less_nums[7] = {};        //номера всех пар в дне
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
 
-} week[2];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
+} week_object[4];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
+
+WeekInfo *week[4] = {&week_object[0], &week_object[1], &week_object[2], &week_object[3]};           //week[4] - массив указателей на обьекты структуры WeekInfo. 0 и 1 - для настоящей четности, а 2 и 3 - для противоположной у обоих подгрупп
 
 struct CoutntInfo {
   String surn;
@@ -226,7 +228,8 @@ class Sheet {
   private:
 
   public:
-    void begin() {
+    void begin() {                                       //is_start обозначает, вызывается ли эта функция в начала работы программы или после очередной проверки актульность недели во время работы
+      
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
       GSheet.setPrerefreshSeconds(10 * 60);
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
@@ -243,14 +246,14 @@ class Sheet {
       } 
       digitalWrite(2, false);
 
-      editServiceMess("Google Sheet API успешно подключено!");
-      checkTableWeek();                                                 //проверяем неделю на актуальность
-      
-      for (byte i = 0; i < 2; i++) {
+      editServiceMess("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
+
+      for (byte i = 0; i < 4; i++) {
         String get_cell = "", range = "";
+        bool parity_offset = 0;                       //бывает 0 или 1, показывает, парсим данные из недели последней или предыдущей соответственно четности
         
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
-        if (!i) range += Sheet1;
+        if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += weekInfo_c;
         range += (weekInfo_i + (offset[i]*(week_off-1)));
@@ -265,21 +268,21 @@ class Sheet {
           get_cell.toLowerCase();
           Text cell(get_cell);
           if (!iter)  {
-            if (cell == "числитель") week[i].parity = false;
-            else week[i].parity = true;
+            if (cell == "числитель") week[i]->parity = false;
+            else week[i]->parity = true;
           }
 
           else if (iter == 1) {
-            week[i].study_days = cell.toInt();
+            week[i]->study_days = cell.toInt();
           }
 
           else { 
             if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
-            week[i].subj_num[iter-2] = cell.toInt();
-            if (!week[i].subj_num[iter-2])  {                       //если в этот день пар нет, все равно выделяем 1 элемент, чтобы там был 0. Возможно нужно в некоторых случаях
-              week[i].less_nums[iter-2] = new byte[1]{};
+            week[i]->subj_num[iter-2] = cell.toInt();
+            if (!week[i]->subj_num[iter-2])  {                       //если в этот день пар нет, все равно выделяем 1 элемент, чтобы там был инициализирован 0. Возможно нужно в некоторых случаях, хезе кароч
+              week[i]->less_nums[iter-2] = new byte[1]{};
             }
-            else  week[i].less_nums[iter-2] = new byte[week[i].subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
+            else  week[i]->less_nums[iter-2] = new byte[week[i]->subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
           }
         }
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
@@ -293,18 +296,18 @@ class Sheet {
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
           for (byte q = 0; q < cell.length(); q++) {
-            if (iter == 0)  week[i].pon_day = (week[i].pon_day * 10 + cell[q] - '0');
-            else if (iter == 1)  week[i].pon_month = (week[i].pon_month * 10 + cell[q] - '0');
+            if (iter == 0)  week[i]->pon_day = (week[i]->pon_day * 10 + cell[q] - '0');
+            else if (iter == 1)  week[i]->pon_month = (week[i]->pon_month * 10 + cell[q] - '0');
           }
         }
 
         if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
-          if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i].pon_day--;
-          else if (firstDayName == "среда" || firstDayName == "Среда") week[i].pon_day-=2;
-          else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i].pon_day-=3;
-          else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i].pon_day-=4;
-          else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i].pon_day-=5;
-          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i].pon_day-=6;
+          if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_day--;
+          else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_day-=2;
+          else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_day-=3;
+          else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_day-=4;
+          else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_day-=5;
+          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_day-=6;
           else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName, Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
@@ -322,9 +325,9 @@ class Sheet {
         bool prev = false;
 
         for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар
-          if (week[i].subj_num[s] == 0) continue;
+          if (week[i]->subj_num[s] == 0) continue;
           if (prev) len += 1;
-          len += week[i].subj_num[s];
+          len += week[i]->subj_num[s];
           prev = true;
         }
 
@@ -345,20 +348,20 @@ class Sheet {
             continue;
           }
 
-          byte lesson_count = week[i].subj_num[job_day];
+          byte lesson_count = week[i]->subj_num[job_day];
 
           while (!lesson_count) {               //пока пар в этот день нет
             job_day++;
-            lesson_count = week[i].subj_num[job_day];       //ищем день, в который они есть
+            lesson_count = week[i]->subj_num[job_day];       //ищем день, в который они есть
           }
 
           //bot.sendMessage(String(this_cell) + " / " + String(lesson_count) + " / " + String(job_day),  error_chat);
 
-          week[i].less_nums[job_day][lesson_in_day] = this_cell.toInt();
+          week[i]->less_nums[job_day][lesson_in_day] = this_cell.toInt();
           lesson_in_day++;
         }
 
-
+        /*
         for (int b = 0; b < 7; b++) {                     //вывод, оставим на случай отладки
           byte ii = week[i].subj_num[b];
           if (!ii)  ii++;
@@ -366,54 +369,12 @@ class Sheet {
             bot.sendMessage(String(week[i].less_nums[b][d]), error_chat);
           }
           bot.sendMessage("----------", error_chat);
-        }
+        }*/
         //-----------------------Получение номеров всех пар-----------------------------
       }
-      editServiceMess("");
+      checkTableWeek();                                                 //проверяем неделю на актуальность
     }
 
-    void BriefDataFromAnswer(Date *Week_data, byte *subj_num, Text answer, bool parse_date) {
-      // Шаг 1. Парсим массив subj_num  ---------------
-      Text ans = answer.getSub(r_count, "\"");
-      String get_cell = "";
-
-      for (byte iter = 0; iter < ans.count("/"); iter++) {
-        ans.getSub(iter, "/").toString(get_cell);
-        get_cell.toLowerCase();
-        Text cell(get_cell);
-
-        if (iter > 1) { 
-          if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
-          subj_num[iter-2] = cell.toInt();        //вытаскиваем количество пар в iter-2 день (iter-2 = iter начала раздело с информацией о количестве пар в конкретный день)
-        }
-      }
-
-
-      // Шаг 2. Вытаскивает данные для Week_data  ---------------
-      if (parse_date) {
-        Week_data->day = 0;
-        Week_data->month = 0;
-        ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
-        String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта фигня №1
-        
-        for (byte iter = 0; iter < ans.count("."); iter++)  {
-          Text cell = ans.getSub(iter, ".");
-          for (byte q = 0; q < cell.length(); q++) {
-            if (iter == 0)  Week_data->day = (Week_data->day * 10 + cell[q] - '0');
-            else if (iter == 1)  Week_data->month = (Week_data->month * 10 + cell[q] - '0');
-          }
-        }
-        if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
-          if (firstDayName == "вторник" || firstDayName == "Вторник")  Week_data->day--;
-          else if (firstDayName == "среда" || firstDayName == "Среда") Week_data->day-=2;
-          else if (firstDayName == "четверг" || firstDayName == "Четверг") Week_data->day-=3;
-          else if (firstDayName == "пятница" || firstDayName == "Пятница") Week_data->day-=4;
-          else if (firstDayName == "суббота"  || firstDayName == "Суббота") Week_data->day-=5;
-          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") Week_data->day-=6;
-          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName, Admins[0]);
-        }
-      }
-    }
 
     String getCells(String range) {
       byte tries = 0;
@@ -435,7 +396,7 @@ class Sheet {
       valueRange.add("range", range);
       valueRange.add("majorDimension", "ROWS");
 
-      for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
+      for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) {
         String address = "values/[0]/[", data = "";
         address += i;
         address += "]";
@@ -465,7 +426,7 @@ class Sheet {
           byte plus = 0;
 
           for (byte j = 0; j < 7; j++) {
-            plus += week[count.subgroup].subj_num[j] + 1;
+            plus += week[count.subgroup]->subj_num[j] + 1;
           }
 
           range += charOffset(String(people_list_c), 1+plus);
@@ -583,8 +544,8 @@ class Menu {
           }
 
           else if (comm.startsWith("(")) {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
-              if (String(comm[1]) == String(week[nka.subgroup].less_nums[nka.dayWeek-1][i])) {
+            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) {
+              if (String(comm[1]) == String(week[nka.subgroup]->less_nums[nka.dayWeek-1][i])) {
                 edit_page(4);
                 way = "011111";
                 nka_ind = i;
@@ -594,21 +555,21 @@ class Menu {
           }
 
           else if (comm == "Все УП") {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '+';
+            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '+';
             reading_flag = false;
             edit_page(1);
             return;
           }
 
           else if (comm == "Все неУП") {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '-';
+            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '-';
             reading_flag = false;
             edit_page(1);
             return;
           }
 
           else if (comm == "Нет пропусков") {
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) nka.nki[i] = ' ';
+            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) nka.nki[i] = ' ';
             reading_flag = false;
             edit_page(1);
             return;
@@ -622,7 +583,7 @@ class Menu {
             range += nka.posC;
             range += nka.posI;
             range += ":";
-            range += charOffset(nka.posC, week[nka.subgroup].subj_num[nka.dayWeek-1]-1);
+            range += charOffset(nka.posC, week[nka.subgroup]->subj_num[nka.dayWeek-1]-1);
             range += nka.posI;
             list.SetN(range);
             way = "01";
@@ -800,7 +761,7 @@ class Menu {
           mess += nka.year[3];
           mess += "\n";
           getNIndex(nka.subgroup);
-          if (week[nka.subgroup].subj_num[nka.dayWeek-1])  {
+          if (week[nka.subgroup]->subj_num[nka.dayWeek-1])  {
             if (reading_flag) {
               nka.nki = "";                                                 //разобраться, почему нужна эта заплатка и починить (если очень захочется :) )
               if (!nka.subgroup) range += Sheet1;
@@ -808,11 +769,11 @@ class Menu {
               range += nka.posC;
               range += nka.posI;
               range += ":";
-              range += charOffset(nka.posC, week[nka.subgroup].subj_num[nka.dayWeek-1]-1);
+              range += charOffset(nka.posC, week[nka.subgroup]->subj_num[nka.dayWeek-1]-1);
               range += nka.posI;
               answ = list.getCells(range);
               Text answer(answ);
-              for (byte i = 0; i < (week[nka.subgroup].subj_num[nka.dayWeek-1]); i++) {
+              for (byte i = 0; i < (week[nka.subgroup]->subj_num[nka.dayWeek-1]); i++) {
                 String a = "";
                 answer.getSub(r_count + r_offset*i, "\"").toString(a);
                 if (a == "R")  nka.nki += "+";
@@ -821,14 +782,14 @@ class Menu {
               }
             }
 
-            for (byte i = 0; i < week[nka.subgroup].subj_num[nka.dayWeek-1]; i++) {
+            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) {
               mess += "(";
-              mess += week[nka.subgroup].less_nums[nka.dayWeek-1][i];
+              mess += week[nka.subgroup]->less_nums[nka.dayWeek-1][i];
               mess += ") ";
               if (nka.nki[i] == '-')  mess += Disrep;
               else if (nka.nki[i] == '+') mess += Respect;
               else mess += " ";
-              if (i != week[nka.subgroup].subj_num[nka.dayWeek-1]-1) mess += "\t";
+              if (i != week[nka.subgroup]->subj_num[nka.dayWeek-1]-1) mess += "\t";
               else mess += "\n";
             }
 
@@ -1009,6 +970,7 @@ void setup() {
   list.begin();
   menu.start_page(1);       //вот тут уже достраиваем стартовую страницу окончательно
   checkYear();
+  editServiceMess("");
 }
 
 void loop() {
@@ -1019,8 +981,15 @@ void loop() {
   ArduinoOTA.handle();
   FB_Time t = bot.getTime(3);
 
-  if (t.year && !old_year)  old_year = t.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
-  else if (old_year != t.year)  checkYear();          //Если год сменился - опа, произошел новый год, то проверяем на високосность
-  if (t.day && !old_day)  old_day = t.day;
+  if (!old_year && t.year)  old_year = t.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
+  else if (old_year != t.year)  {                     //Если год сменился - опа, произошел новый год, то проверяем на високосность
+    checkYear();
+    old_year = t.year;
+  }
+  if (!old_day && t.day)  old_day = t.day;
+  else if (old_day != t.day) {                        //если сменился день - повод проверить актуальность недели
+    checkTableWeek();
+    old_day = t.day;
+  }
 
 }
