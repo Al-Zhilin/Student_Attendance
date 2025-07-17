@@ -7,7 +7,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
   if (realTime.day == 0) {
-    bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), Admins[0]);
+    bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
     timer.add(bot.lastBotMsg(), 10);
   }
 
@@ -59,7 +59,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
 
     days_between += realTime.day;
     weeksToBuild = days_between / 7;
-    if (days_between % 7 != 0)  bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!"), Admins[0]);
+    if (days_between % 7 != 0)  bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!"), error_chat);
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
@@ -69,7 +69,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
 
   if (ESP.getFreeHeap()/1024 < 40)  {
-    bot.sendMessage(F("Критически мало свободной памяти!\nДостроение новых недель прервано!"), Admins[0]);
+    bot.sendMessage(F("Критически мало свободной памяти!\nДостроение новых недель прервано!"), error_chat);
   }
   
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
@@ -226,7 +226,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
       /*
       String responseStr;
       requests.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
-      bot.sendMessage(responseStr, Admins[0]);
+      bot.sendMessage(responseStr, error_chat);
       */
 
       response.clear();

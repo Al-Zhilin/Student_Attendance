@@ -276,11 +276,14 @@ class Sheet {
           else { 
             if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
             week[i].subj_num[iter-2] = cell.toInt();
-            week[i].less_nums[iter-2] = new byte[week[i].subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
+            if (!week[i].subj_num[iter-2])  {                       //если в этот день пар нет, все равно выделяем 1 элемент, чтобы там был 0. Возможно нужно в некоторых случаях
+              week[i].less_nums[iter-2] = new byte[1]{};
+            }
+            else  week[i].less_nums[iter-2] = new byte[week[i].subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
           }
         }
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
-        
+
 
         //----------------------Дата понедельника этой недели---------------------------
         ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
@@ -314,6 +317,7 @@ class Sheet {
         range += less_num_c;
         range += (less_num_i + (offset[i]*(week_off-1)));
         range += ":";
+
         byte len = 0;
         bool prev = false;
 
@@ -324,40 +328,48 @@ class Sheet {
           prev = true;
         }
 
-        range += charOffset(String(less_num_c), len);
+        range += charOffset(String(less_num_c), len-1);
         range += (less_num_i + (offset[i]*(week_off-1)));
-        Text answa(this->getCells(range));
-        byte faza = 0, supp = 0, iteration = 0;
+        String returned_string = this->getCells(range);
+        Text answa(returned_string);
+
+        byte job_day = 0;                            //отображает дни недели 0...6 который сейчас заполняем, обеспечивает их "смену" в цикле
+        byte lesson_in_day = 0;                        //отоюражает обрабатываемую пару в какой-либо день
+
         for (int s = 0; s < len; s++) {
           Text this_cell = answa.getSub(r_count + r_offset*s, "\"");
-          byte s_num = week[i].subj_num[faza];
-          if (!s_num) s_num++;
 
-          if (supp != s_num) {
-            week[i].less_nums[faza][iteration] = this_cell.toInt();
-            supp++;
-            iteration++;
+          if (String(this_cell) == "") {                //если попался разделитель между днями - переходим на следующий день
+            job_day++;
+            lesson_in_day = 0;
+            continue;
           }
 
-          else {
-            supp = 0;
-            faza++;
-            iteration = 0;
+          byte lesson_count = week[i].subj_num[job_day];
+
+          while (!lesson_count) {               //пока пар в этот день нет
+            job_day++;
+            lesson_count = week[i].subj_num[job_day];       //ищем день, в который они есть
           }
+
+          //bot.sendMessage(String(this_cell) + " / " + String(lesson_count) + " / " + String(job_day),  error_chat);
+
+          week[i].less_nums[job_day][lesson_in_day] = this_cell.toInt();
+          lesson_in_day++;
         }
 
-        /*for (int b = 0; b < 7; b++) {                     //вывод, оставим на случай отладки
+
+        for (int b = 0; b < 7; b++) {                     //вывод, оставим на случай отладки
           byte ii = week[i].subj_num[b];
           if (!ii)  ii++;
           for (int d = 0; d < ii; d++) {
-            bot.sendMessage(String(week[i].less_nums[b][d]));
+            bot.sendMessage(String(week[i].less_nums[b][d]), error_chat);
           }
-          bot.sendMessage("----------");
-        }*/
+          bot.sendMessage("----------", error_chat);
+        }
         //-----------------------Получение номеров всех пар-----------------------------
-
-        editServiceMess("");
       }
+      editServiceMess("");
     }
 
     void BriefDataFromAnswer(Date *Week_data, byte *subj_num, Text answer, bool parse_date) {

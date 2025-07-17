@@ -124,7 +124,7 @@ void briefInput(Text message, String chat) {
 
       if (func_res == 2 && syntax_errors <= min_syntax_errors) {
         if (syntax_errors == min_syntax_errors) {
-          bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString());
+          bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString(), error_chat);
           timer.add(bot.lastBotMsg(), 10);
           break;
         }
@@ -133,7 +133,7 @@ void briefInput(Text message, String chat) {
       }
 
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
-        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_surname + "\"");
+        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_surname + "\"", error_chat);
         timer.add(bot.lastBotMsg(), 10);
         //------------------Здесь вызываем функцию постановки Нки-----------------------------
         surname_found = true;
