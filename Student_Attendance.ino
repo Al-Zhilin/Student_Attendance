@@ -250,16 +250,17 @@ class Sheet {
 
       for (byte i = 0; i < 4; i++) {
         String get_cell = "", range = "";
-        bool parity_offset = 0;                       //бывает 0 или 1, показывает, парсим данные из недели последней или предыдущей соответственно четности
-        
+        byte parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей соответственно четности
+        if (i > 1) parity_offset = 2;
+
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset[i]*(week_off-1)));
+        range += (weekInfo_i + (offset[i]*(week_off-parity_offset)));
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i]*(week_off-1)));
+        range += (weekInfo_i + (offset[i]*(week_off-parity_offset)));
         Text answer(this->getCells(range));
         Text ans = answer.getSub(r_count, "\"");
 
@@ -315,10 +316,10 @@ class Sheet {
 
         //-----------------------Получение номеров всех пар-----------------------------
         range = "";
-        if (!i) range += Sheet1;
+        if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += less_num_c;
-        range += (less_num_i + (offset[i]*(week_off-1)));
+        range += (less_num_i + (offset[i]*(week_off-parity_offset)));
         range += ":";
 
         byte len = 0;
@@ -332,7 +333,7 @@ class Sheet {
         }
 
         range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset[i]*(week_off-1)));
+        range += (less_num_i + (offset[i]*(week_off-parity_offset)));
         String returned_string = this->getCells(range);
         Text answa(returned_string);
 

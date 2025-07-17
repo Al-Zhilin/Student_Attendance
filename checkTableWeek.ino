@@ -1,4 +1,4 @@
-uint8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
+int8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
   FB_Time realTime = bot.getTime(3);                            //структура реального времени
   uint32_t Heap;
 
@@ -9,7 +9,7 @@ uint8_t checkTableWeek() {            //функция проверки и до�
   if (realTime.day == 0) {
     bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
     timer.add(bot.lastBotMsg(), 10);
-    return;
+    return -1;
   }
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
