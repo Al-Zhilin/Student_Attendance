@@ -14,21 +14,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   Date dateToWeek;
-  byte subj_num[2][7] = {};
-
-  for (byte z = 0; z < 2; z++) {        //цикл получает нужные данные для данной недели и для недели прошлой четности. В данный момент для 1 подгруппы
-    String range = "";
-    range += Sheet1;
-    range += weekInfo_c;
-    range += (weekInfo_i + (offset[0]*(week_off-(z+1))));
-    if (!z) {                                                //если z == 0, значит кроме subj_num будем парсить и dateToWeek, т.к нам нужна именно дата понедельника недели НАСТОЯЩЕЙ четности
-      range += ":";
-      range += charOffset(String(weekInfo_c), 1);
-      range += (weekInfo_i + (offset[0]*(week_off-(z+1))));
-    }
-    Text answer(list.getCells(range));
-    list.BriefDataFromAnswer(&dateToWeek, subj_num[z], answer, !z);
-  }
+  dateToWeek.day = week[0]->pon_day;
+  dateToWeek.month = week[0]->pon_month;
   
   byte pulled_day = dateToWeek.day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
   byte pulled_month = dateToWeek.month;
@@ -70,38 +57,26 @@ int8_t checkTableWeek() {            //функция проверки и дос
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
 
   if (ESP.getFreeHeap()/1024 < 40)  {
-    bot.sendMessage(F("Критически мало свободной памяти!\nДостроение новых недель прервано!"), error_chat);
+    bot.sendMessage(F("Возможна нехватка свободной памяти!\nДостроение новых недель прервано!"), error_chat);
   }
   
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
     // Получаем данные о парах кахдого дня недели противоположной и настоящей четности подгруппы (нужно для tableLen и дальнейшего заполнения)
     for (byte z = 0; z < 2; z++) {        //цикл получает нужные данные для данной недели и для недели прошлой четности
-      if (i) {                          //получаем эти данные только для 2 подгруппы, для 1 уже получали ранее
-        String range = "";
-        range += Sheet2;
-        range += weekInfo_c;
-        range += (weekInfo_i + (offset[i]*(week_off-(z+1))));
-        if (!z) {                                                //если z == 0, значит кроме subj_num будем парсить и dateToWeek, т.к нам нужна именно дата понедельника недели НАСТОЯЩЕЙ четности
-          range += ":";
-          range += charOffset(String(weekInfo_c), 1);
-          range += (weekInfo_i + (offset[i]*(week_off-(z+1))));
-        }
-        Text answer(list.getCells(range));
-        list.BriefDataFromAnswer(&dateToWeek, subj_num[z], answer, !z);
-      }
-
       // ищем 2 длины - для каждой четности недели у i подгруппы
       bool prev = false;
       tableLen[z] = 0;
 
       for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (subj_num[z][s] == 0) continue;
+        if (week[i+2*z]->subj_num[s] == 0) continue;
         if (prev) tableLen[z] += 1;
-        tableLen[z] += subj_num[z][s];
+        tableLen[z] += week[i+2*z]->subj_num[s];
         prev = true;
       }
     }
-
+    
+    dateToWeek.day = week[i]->pon_day;
+    dateToWeek.month = week[i]->pon_month;
     sumDate(&dateToWeek, 6);
 
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
@@ -178,9 +153,14 @@ int8_t checkTableWeek() {            //функция проверки и дос
       String Value = "";
       bool prev = false;
 
-      for (byte j = 0; j < 7; j++) {
-        byte numSubjects = subj_num[iter % 2 == 0][j];        //введем для читаемости
+      for (byte j = 0; j < 7; j++) {     
+        byte numSubjects = 0;               //введем для читаемости в отдельную переменную
+
+        if (iter % 2 !
         
+        = 0) numSubjects = week[i]->subj_num[j];
+        else  numSubjects = week[i+2]->subj_num[j];   
+
         if (!numSubjects) {
           sumDate(&dateToWeek, 1);      //+1, т.к. переходим к следующему дню
           continue;             //если пар в этот день нет - пропускаем
@@ -234,10 +214,30 @@ int8_t checkTableWeek() {            //функция проверки и дос
       requests.clear();
     }
   }
+  
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   editServiceMess("Достроено " + String(weeksToBuild) + " недель!");
   week_off += weeksToBuild;
   EEPROM_PUT(0, week_off);
+
+  if (weeksToBuild % 2 != 0) {                  //тогда меняем местами указатели. Настоящаая четность поменялась
+    for (byte x = 0; x < 2; x++) {
+      WeekInfo *temp = week[2*x];
+      week[2*x] = week[1 + 2*x];
+      week[1 + 2*x] = temp;
+    }
+  }
+
+  sumDate(dateToWeek, -6);
+
+  for (byte k = 0; k < 2; k++) {                //делаем pon_day и pon_month актуальными под последние недели
+    if (k) sumDate(dateToWeek, -7);
+    week[0+2*k]->pon_day = dateToWeek.day;
+    week[1+2*k]->pon_day = dateToWeek.day;
+    week[0+2*k]->pon_month = dateToWeek.month;
+    week[1+2*k]->pon_month = dateToWeek.month;
+  }
+  
   return weeksToBuild;
 }
 
@@ -251,13 +251,22 @@ uint16_t columnLetterToIndex(const String& col) {         //конвертаци
   return result - 1;
 }
 
-void sumDate(Date *date, byte day_offset) {              //функция суммирования стурктуры Date с неким числом дней. Изменяет напрямую переданный обьект
+void sumDate(Date *date, int day_offset) {              //функция суммирования (как в плюс, так и в минус) стурктуры Date с неким числом дней. Изменяет напрямую переданный обьект
   int total_day = date->day + day_offset;
 
+  // Прибавление дней
   while (total_day > day_month[(date->month - 1) % 12]) {           //даже с проверкой перехода нового года
     total_day -= day_month[(date->month - 1) % 12];
     date->month++;
     if (date->month > 12) date->month = 1;
   }
+
+  // Вычитание дней
+  while (total_day <= 0) {
+    date->month--;
+    if (date->month < 1) date->month = 12;
+    total_day += day_month[(date->month - 1) % 12];
+  }
+
   date->day = total_day;
 }

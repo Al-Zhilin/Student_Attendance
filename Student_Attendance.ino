@@ -237,39 +237,38 @@ class Sheet {
       editServiceMess("Подключаюсь к Google Sheet API...");
 
       uint32_t reset_timer = millis();
-      digitalWrite(2, true);
+      //digitalWrite(2, true);
       while (!(this->ready()))  {
         ArduinoOTA.handle();
         if (millis() - reset_timer >= 60*1000) {
           ESP.restart();
         }
-      } 
-      digitalWrite(2, false);
+      }
+      //digitalWrite(2, false);
 
       editServiceMess("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
 
       for (byte i = 0; i < 4; i++) {
         String get_cell = "", range = "";
-        byte parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей соответственно четности
+        byte parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей четности соответственно
         if (i > 1) parity_offset = 2;
 
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset[i]*(week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i]*(week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
         Text answer(this->getCells(range));
         Text ans = answer.getSub(r_count, "\"");
 
         for (byte iter = 0; iter < ans.count("/"); iter++) {
           ans.getSub(iter, "/").toString(get_cell);
-          get_cell.toLowerCase();
           Text cell(get_cell);
           if (!iter)  {
-            if (cell == "числитель") week[i]->parity = false;
+            if (cell == "числитель" || cell == "Числитель") week[i]->parity = false;
             else week[i]->parity = true;
           }
 
@@ -309,7 +308,7 @@ class Sheet {
           else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_day-=4;
           else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_day-=5;
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_day-=6;
-          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: " + firstDayName, Admins[0]);
+          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!", Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
 
@@ -319,7 +318,7 @@ class Sheet {
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += less_num_c;
-        range += (less_num_i + (offset[i]*(week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
         range += ":";
 
         byte len = 0;
@@ -333,7 +332,7 @@ class Sheet {
         }
 
         range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset[i]*(week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
         String returned_string = this->getCells(range);
         Text answa(returned_string);
 
@@ -362,12 +361,12 @@ class Sheet {
           lesson_in_day++;
         }
 
-        /*
-        for (int b = 0; b < 7; b++) {                     //вывод, оставим на случай отладки
-          byte ii = week[i].subj_num[b];
+        
+        /*for (int b = 0; b < 7; b++) {                     //вывод, оставим на случай отладки
+          byte ii = week[i]->subj_num[b];
           if (!ii)  ii++;
           for (int d = 0; d < ii; d++) {
-            bot.sendMessage(String(week[i].less_nums[b][d]), error_chat);
+            bot.sendMessage(String(week[i]->less_nums[b][d]), error_chat);
           }
           bot.sendMessage("----------", error_chat);
         }*/
@@ -958,7 +957,7 @@ void setup() {
   EEPROM.begin(20);                                                           //инициализируем память для EEPROM
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  EEPROM_START();                                                             //подтягиваем из памяти все значения
+  //EEPROM_START();                                                             //подтягиваем из памяти все значения
 
   bot.clearServiceMessages(true);
   ArduinoOTA.setHostname(OTA_NAME);
