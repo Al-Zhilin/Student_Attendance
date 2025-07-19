@@ -49,7 +49,7 @@ byte offset[] = {23, 24};                                                       
 
 FastBot bot(BOT_TOKEN);
 
-byte week_off = 13;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
+byte week_off = 14;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
 bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
@@ -114,7 +114,6 @@ struct SetInfo {      //структура с данными, нужными д�
   String c;             //символьная составляющая ячейки с первой нкой
   int i;                //численная составляющая ячейки с первой нкой
   bool parity;          //четность/нечетность (0/1 соответственно) недели, в которой ставим Нку
-
 } nka;
 
 struct WeekInfo {
@@ -155,6 +154,7 @@ struct timer_data {
   uint32_t start_millis = 0;
   int32_t message_id = 0;
   uint16_t period = 0;            //в секундах
+  char chat_id[15] = "";
 };
 
 class DeleteTimer {
@@ -163,8 +163,19 @@ class DeleteTimer {
   timer_data *ptr = nullptr;
 
   public:
-  void add(int32_t message_id, uint16_t period) {
+  ~DeleteTimer() {                      //мало ли
+    if (ptr != nullptr) {
+      free(ptr);
+      ptr = nullptr;
+    }
+  }
+
+  void add(int32_t message_id, uint16_t period, String StringChatId) {
     if (timer_size+1 > 255)  return;                   //проверка на переполнения счетчика сообщений, обрабатываемых таймером
+    if (StringChatId.length() >= sizeof(ptr[timer_size-1].chat_id))  {
+      bot.sendMessage(F("В массиве стуктыры обьекта для таймера не хватает места для записи этого chat_id!\nНе удалось добавить новый обьект!"), error_chat);
+      return;
+    }
 
     timer_data *temp = (timer_data *)realloc(ptr, (++timer_size)*sizeof(timer_data));           //выделяем память под данные нового таймера
     if (temp == nullptr)  return;                 //проверка на успешность перераспределения памяти
@@ -172,7 +183,8 @@ class DeleteTimer {
     
     ptr[timer_size-1].period = period;
     ptr[timer_size-1].start_millis = millis();
-    ptr[timer_size-1].message_id = message_id; 
+    ptr[timer_size-1].message_id = message_id;                                
+    StringChatId.toCharArray(ptr[timer_size-1].chat_id, sizeof(ptr[timer_size-1].chat_id));
   }
 
   void tick() {
@@ -183,7 +195,7 @@ class DeleteTimer {
       bool need_delete = false;
       for (byte i = 0; i < timer_size; i++) {
         if (millis() - ptr[i].start_millis >= ptr[i].period*1000) {
-          bot.deleteMessage(ptr[i].message_id);
+          bot.deleteMessage(ptr[i].message_id, String(ptr[i].chat_id));
           ptr[i].message_id = -1;
           need_delete = true;
         }
@@ -249,7 +261,7 @@ class Sheet {
       editServiceMess("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
 
       for (byte i = 0; i < 4; i++) {
-        String get_cell = "", range = "";
+        String get_cell = "", range = "", returned_string;
         byte parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей четности соответственно
         if (i > 1) parity_offset = 2;
 
@@ -261,7 +273,8 @@ class Sheet {
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
         range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
-        Text answer(this->getCells(range));
+        returned_string = this->getCells(range);
+        Text answer(returned_string);
         Text ans = answer.getSub(r_count, "\"");
 
         for (byte iter = 0; iter < ans.count("/"); iter++) {
@@ -308,7 +321,7 @@ class Sheet {
           else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_day-=4;
           else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_day-=5;
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_day-=6;
-          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!", Admins[0]);
+          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\n" + answer.toString(), Admins[0]);
         }
         //----------------------Дата понедельника этой недели---------------------------
 
@@ -333,7 +346,7 @@ class Sheet {
 
         range += charOffset(String(less_num_c), len-1);
         range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
-        String returned_string = this->getCells(range);
+        returned_string = this->getCells(range);
         Text answa(returned_string);
 
         byte job_day = 0;                            //отображает дни недели 0...6 который сейчас заполняем, обеспечивает их "смену" в цикле
@@ -593,7 +606,7 @@ class Menu {
 
           else if (comm.startsWith("В этот")) {
             bot.sendMessage("Чо жмешь? Сказали же, пар в выбранный день нет!", user);
-            timer.add(bot.lastBotMsg(), 7);
+            timer.add(bot.lastBotMsg(), 7, user);
             return;
           }
 

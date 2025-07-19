@@ -29,7 +29,7 @@ void briefInput(Text message, String chat) {
   if (input_found == 0)  return;         //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
   bot.sendMessage("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...", chat);
-  timer.add(bot.lastBotMsg(), 17);
+  timer.add(bot.lastBotMsg(), 17, chat);
   m_id = bot.lastBotMsg();
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
@@ -125,7 +125,7 @@ void briefInput(Text message, String chat) {
       if (func_res == 2 && syntax_errors <= min_syntax_errors) {
         if (syntax_errors == min_syntax_errors) {
           bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString(), error_chat);
-          timer.add(bot.lastBotMsg(), 10);
+          timer.add(bot.lastBotMsg(), 10, error_chat);
           break;
         }
         min_syntax_errors = syntax_errors;
@@ -134,14 +134,14 @@ void briefInput(Text message, String chat) {
 
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
         bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_surname + "\"", error_chat);
-        timer.add(bot.lastBotMsg(), 10);
+        timer.add(bot.lastBotMsg(), 10, error_chat);
         //------------------Здесь вызываем функцию постановки Нки-----------------------------
         surname_found = true;
       }
     }
     if (!surname_found) {
       bot.sendMessage("Неизвестная фамилия: " + String(dataa) + "!", chat);
-      timer.add(bot.lastBotMsg(), 10);
+      timer.add(bot.lastBotMsg(), 10, chat);
     }
   }
 

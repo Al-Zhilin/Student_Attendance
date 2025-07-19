@@ -8,7 +8,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
   if (realTime.day == 0) {
     bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
-    timer.add(bot.lastBotMsg(), 10);
+    timer.add(bot.lastBotMsg(), 10, error_chat);
     return -1;
   }
 
@@ -156,9 +156,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
       for (byte j = 0; j < 7; j++) {     
         byte numSubjects = 0;               //введем для читаемости в отдельную переменную
 
-        if (iter % 2 !
-        
-        = 0) numSubjects = week[i]->subj_num[j];
+        if (iter % 2 != 0) numSubjects = week[i]->subj_num[j];
         else  numSubjects = week[i+2]->subj_num[j];   
 
         if (!numSubjects) {
@@ -221,23 +219,25 @@ int8_t checkTableWeek() {            //функция проверки и дос
   EEPROM_PUT(0, week_off);
 
   if (weeksToBuild % 2 != 0) {                  //тогда меняем местами указатели. Настоящаая четность поменялась
+    bot.sendMessage("Меянем недельки", Admins[0]);
     for (byte x = 0; x < 2; x++) {
-      WeekInfo *temp = week[2*x];
-      week[2*x] = week[1 + 2*x];
-      week[1 + 2*x] = temp;
+      WeekInfo *temp = week[x];
+      week[x] = week[x + 2];
+      week[x + 2] = temp;
     }
   }
 
-  sumDate(dateToWeek, -6);
+  sumDate(&dateToWeek, -6);
 
-  for (byte k = 0; k < 2; k++) {                //делаем pon_day и pon_month актуальными под последние недели
-    if (k) sumDate(dateToWeek, -7);
+  for (byte k = 0; k < 2; k++) {                //делаем pon_day и pon_month актуальными под последние недели. Какая то сложная схема, мб нужно переделать на что то попроще или вообще без цикла
+    if (k) sumDate(&dateToWeek, -7);
     week[0+2*k]->pon_day = dateToWeek.day;
     week[1+2*k]->pon_day = dateToWeek.day;
     week[0+2*k]->pon_month = dateToWeek.month;
     week[1+2*k]->pon_month = dateToWeek.month;
   }
   
+  bot.sendMessage(String(week[0]->pon_day) + "." + String(week[0]->pon_month) + "/" + String(week[0]->parity), Admins[0]);
   return weeksToBuild;
 }
 
