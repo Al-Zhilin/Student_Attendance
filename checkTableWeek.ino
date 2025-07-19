@@ -219,7 +219,6 @@ int8_t checkTableWeek() {            //функция проверки и дос
   EEPROM_PUT(0, week_off);
 
   if (weeksToBuild % 2 != 0) {                  //тогда меняем местами указатели. Настоящаая четность поменялась
-    bot.sendMessage("Меянем недельки", Admins[0]);
     for (byte x = 0; x < 2; x++) {
       WeekInfo *temp = week[x];
       week[x] = week[x + 2];
@@ -237,7 +236,6 @@ int8_t checkTableWeek() {            //функция проверки и дос
     week[1+2*k]->pon_month = dateToWeek.month;
   }
   
-  bot.sendMessage(String(week[0]->pon_day) + "." + String(week[0]->pon_month) + "/" + String(week[0]->parity), Admins[0]);
   return weeksToBuild;
 }
 
