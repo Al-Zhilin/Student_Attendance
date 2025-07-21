@@ -170,7 +170,7 @@ String DecodeReason(byte faza) {                      //удобно возвр�
       break;
 
     default:
-      return "неправильно указанной даты"
+      return "неправильно указанной даты";
       break;
   }
 
