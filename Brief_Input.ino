@@ -73,24 +73,33 @@ void briefInput(Text message, String chat) {
       i += charLen; // увеличиваем i на длину символа
     }
 
-    if (found_month > 12 || found_month < 1)  bot.editMessage(m_id, "Значение месяца в сокращенном вводе некорректно!");
-    if (found_day > day_month[found_month] || found_day < 1)  bot.editMessage(m_id, "Значение дня в сокращенном вводе некорректно!");
+    if (faza == 2) {
+      if (unique_end) {
+        if (condition.endsWith("вчера"))  found_day = real_time.day-1;
+        else if (condition.endsWith("позавчера")) found_day = real_time.day-2;
+        else if (condition.endsWith("сегодня")) found_day = real_time.day;
+        found_month = real_time.month;
+      }
+
+      else {
+        found_day = real_time.day;
+        found_month = real_time.month;
+      }
+    }
+
+    if (found_month > 12 || found_month < 1)  bot.editMessage(m_id, "Значение месяца в сокращенном вводе некорректно (\"" + String(found_month) + "\")!", chat);
+    if (found_day > day_month[found_month] || found_day < 1)  bot.editMessage(m_id, "Значение дня в сокращенном вводе некорректно (\"" + String(found_day) + "\")!", chat);
     //----------------------------------добавить проверку адекватности введенной пары----------------------------------
 
-    if (faza == 2 && unique_end) {
-      if (condition.endsWith("вчера"))  found_day = real_time.day-1;
-      else if (condition.endsWith("позавчера")) found_day = real_time.day-2;
-      else if (condition.endsWith("сегодня")) found_day = real_time.day;
-      found_month = real_time.month;
-    } 
-
-    else if (faza != 4) {
-      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"");
+    if (faza != 4 && faza != 2) {
+      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за " + DecodeReason(faza) + "!", chat);
       return;
     }
+
+    bot.sendMessage("пара: " + String(found_less) + "\nДата: " + String(found_day) + "." + String(found_month), error_chat);
   }
 
-  else {                                 //Присваиваем данные текущего дня и пары, которая идет именно сейчас, если пользователь не указал эти данные явно
+  else {                                 //Присваиваем данные текущего дня и пары, которая идет именно сейчас, если пользователь не указал эти данные явно (ввод без условия)
     found_day = real_time.day;
     found_month = real_time.month;
     Time now_time(real_time.hour, real_time.minute);
@@ -148,4 +157,22 @@ void briefInput(Text message, String chat) {
   }
 
   bot.editMessage(m_id, F("Сокращенный ввод обработан!"));
+}
+
+String DecodeReason(byte faza) {                      //удобно возвращает текстовое представление фазы при парсинге условия в сокращенном вводе, в нужном падеже
+  switch (faza) {
+    case 0:
+      return "неправильно заданной пары";
+      break;
+    
+    case 1:
+      return "некорректной записи слова \"пара\"";
+      break;
+
+    default:
+      return "неправильно указанной даты"
+      break;
+  }
+
+  return "";
 }
