@@ -48,22 +48,24 @@ void getNIndex(bool subgr) {
 
   if (!found) {
     bot.sendMessage(F("GetIndex: surname not found!"), error_chat);
-    timer.add(bot.lastBotMsg(), 25, error_chat);
+    timer.add(bot.lastBotMsg(), 20, error_chat);
   }
+
+  if (weeks_ago % 2 == 0) nka.parity = week[nka.subgroup]->parity;
+  else nka.parity = !week[nka.subgroup]->parity;
+  nka.dayWeek = days_ago+1;
+
   int sm = 1;
-  bool prev = false;
- 
+  bool prev = true;
+
   for (int i = 0; i < days_ago; i++) {
-    if (week[subgr]->subj_num[i] == 0) continue;
+    if (week[subgr + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i] == 0) continue;
 
     if (prev) sm++;
     prev = true;
 
-    sm += week[subgr]->subj_num[i];
+    sm += week[subgr + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i];
   }
   
-  if (weeks_ago % 2 == 0) nka.parity = week[nka.subgroup]->parity;
-  else nka.parity = !week[nka.subgroup]->parity;
-  nka.dayWeek = days_ago+1;
   nka.posC = charOffset(String(people_list_c), sm);
 }

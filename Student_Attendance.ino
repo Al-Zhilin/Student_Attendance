@@ -568,21 +568,24 @@ class Menu {
           }
 
           else if (comm == "Все УП") {
-            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '+';
+            nka.nki = "";
+            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '+';
             reading_flag = false;
             edit_page(1);
             return;
           }
 
           else if (comm == "Все неУП") {
-            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) nka.nki[i] = '-';
+            nka.nki = "";
+            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '-';
             reading_flag = false;
             edit_page(1);
             return;
           }
 
           else if (comm == "Нет пропусков") {
-            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) nka.nki[i] = ' ';
+            nka.nki = "";
+            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += ' ';
             reading_flag = false;
             edit_page(1);
             return;
@@ -774,7 +777,8 @@ class Menu {
           mess += nka.year[3];
           mess += "\n";
           getNIndex(nka.subgroup);
-          if (week[nka.subgroup]->subj_num[nka.dayWeek-1])  {
+          byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);                               //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
+          if (week[week_index]->subj_num[nka.dayWeek-1])  {               //если в этот день пары есть (в день, соответственной Нке по четности, недели)
             if (reading_flag) {
               nka.nki = "";                                                 //разобраться, почему нужна эта заплатка и починить (если очень захочется :) )
               if (!nka.subgroup) range += Sheet1;
@@ -782,11 +786,11 @@ class Menu {
               range += nka.posC;
               range += nka.posI;
               range += ":";
-              range += charOffset(nka.posC, week[nka.subgroup]->subj_num[nka.dayWeek-1]-1);
+              range += charOffset(nka.posC, week[week_index]->subj_num[nka.dayWeek-1]-1);
               range += nka.posI;
               answ = list.getCells(range);
               Text answer(answ);
-              for (byte i = 0; i < (week[nka.subgroup]->subj_num[nka.dayWeek-1]); i++) {
+              for (byte i = 0; i < (week[week_index]->subj_num[nka.dayWeek-1]); i++) {
                 String a = "";
                 answer.getSub(r_count + r_offset*i, "\"").toString(a);
                 if (a == "R")  nka.nki += "+";
@@ -795,14 +799,14 @@ class Menu {
               }
             }
 
-            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) {
+            for (byte i = 0; i < week[week_index]->subj_num[nka.dayWeek-1]; i++) {             //отображать бужем пары, которые есть в день, когда Нки будем ставить
               mess += "(";
-              mess += week[nka.subgroup]->less_nums[nka.dayWeek-1][i];
+              mess += week[week_index]->less_nums[nka.dayWeek-1][i];
               mess += ") ";
               if (nka.nki[i] == '-')  mess += Disrep;
               else if (nka.nki[i] == '+') mess += Respect;
               else mess += " ";
-              if (i != week[nka.subgroup]->subj_num[nka.dayWeek-1]-1) mess += "\t";
+              if (i != week[week_index]->subj_num[nka.dayWeek-1]-1) mess += "\t";
               else mess += "\n";
             }
 
@@ -970,7 +974,7 @@ void setup() {
   EEPROM.begin(20);                                                           //инициализируем память для EEPROM
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  //EEPROM_START();                                                             //подтягиваем из памяти все значения
+  EEPROM_START();                                                             //подтягиваем из памяти все значения
 
   bot.clearServiceMessages(true);
   ArduinoOTA.setHostname(OTA_NAME);
