@@ -1,4 +1,6 @@
-byte CheckSurnameMatch(const String s_input, const String s_list, byte* syntax_errors) {          //разные варианты совпадения строк и их сравнения
+byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors) {          //разные варианты совпадения строк и их сравнения
+  s_input.trim();
+  s_list.trim();
   if (s_input == s_list) return 1;
   if (s_input.length() != s_list.length()) return 0;
   for (byte i = 0; i < s_input.length() && i < s_list.length(); i+=2) {

@@ -2,7 +2,7 @@ void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0;
   const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать межде значащими частями в сокращенном вводе
-  int32_t m_id = 0;         //Храним id сообщения, которое будет информировать пользователя о состоянии введенного им сокращенного ввода (принят/не принят, правильно введен/неправильно)
+  int32_t m_id = 0;                        //Храним id сообщения, которое будет информировать пользователя о состоянии введенного им сокращенного ввода (принят/не принят, правильно введен/неправильно)
   String supp = "";
   FB_Time real_time = bot.getTime(3);
 
@@ -16,7 +16,7 @@ void briefInput(Text message, String chat) {
   }
 
   if (!input_found) {
-    dataa = message.getSub(1, "\n");
+    dataa = message.getSub(1, "\n"); 
     for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) {           //ВТОРАЯ строка сообщения - фамилия (сокращенный с условием)
       syntax_errors = 0;
       if (CheckSurnameMatch(dataa.toString(), students[i].surname, &syntax_errors)) {
@@ -24,12 +24,14 @@ void briefInput(Text message, String chat) {
         break;
       }
     }
+    if (message.getSub(0, "\n").toString().toInt() == 0)  input_found = 1;                      //если первая строка не фамилия (проверили ранее) но и не условие - значит просто сильно опечатанная фамилия. Принимаем как сокр ввода без условия
   }
 
   if (input_found == 0)  return;         //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
   bot.sendMessage("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...", chat);
-  timer.add(bot.lastBotMsg(), 17, chat);
+  timer.add(bot.lastBotMsg(), 15, chat);
+  timer.add(bot.lastUsrMsg(), 15, chat);
   m_id = bot.lastBotMsg();
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
@@ -37,7 +39,7 @@ void briefInput(Text message, String chat) {
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
-    for (int i = 0; i < condition.length(); ) {
+    for (int i = 0; i < condition.length(); /*этот пункт прописан отдельно дальше*/) {
       byte c = condition[i], charLen = 1;
 
       if ((c & 0x80) == 0x00) charLen = 1; // ASCII
@@ -47,7 +49,7 @@ void briefInput(Text message, String chat) {
 
       if (faza == 0) {    //ищем номер пары
         if (isDigit(symbol[0])) found_less = found_less*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
-        else faza++;
+        else if (found_less) faza++;
       }
 
       if (faza == 1) {    //ищем слово "пара"
@@ -61,11 +63,11 @@ void briefInput(Text message, String chat) {
         else if (isDigit(symbol[0])) found_day = found_day*10 + (symbol[0] - '0');
       }
 
-      if (faza == 3) {
+      if (faza == 3) {    //ищем месяц
         if (isDigit(symbol[0])) {
           found_month = found_month*10 + (symbol[0] - '0');
-          faza = 4;
         }
+        else if (found_month) faza = 4;
       }
 
       i += charLen; // увеличиваем i на длину символа
@@ -101,7 +103,7 @@ void briefInput(Text message, String chat) {
       }
     }
     if (!found_less) {
-      bot.editMessage(m_id, "Не удалось получить информацию о паре, которая идет прямо сейчас в сокращенном вводе без условия! Проверьте MINUTES_OFFSET в настройках программы, заданы ли временный рамки для данной пары в структуре или укажите условие вручную!");
+      bot.editMessage(m_id, "Не удалось получить информацию о паре, которая идет прямо сейчас в сокращенном вводе без условия! Проверьте MINUTES_OFFSET в настройках программы, заданы ли временные рамки для данной пары в структуре или укажите условие вручную!");
       return;
     }
   }
