@@ -39,7 +39,7 @@ void briefInput(Text message, String chat) {
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
-    for (int i = 0; i < condition.length(); /*этот пункт прописан отдельно дальше*/) {
+    for (int i = 0; i < condition.length(); /*этот пункт прописан отдельно дальше*/) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста
       byte c = condition[i], charLen = 1;
 
       if ((c & 0x80) == 0x00) charLen = 1; // ASCII
@@ -48,6 +48,7 @@ void briefInput(Text message, String chat) {
       String symbol = condition.substring(i, i + charLen);
 
       if (faza == 0) {    //ищем номер пары
+        //----------------------------------добавить проверку адекватности введенной пары----------------------------------
         if (isDigit(symbol[0])) found_less = found_less*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
         else if (found_less) faza++;
       }
@@ -60,20 +61,34 @@ void briefInput(Text message, String chat) {
       if (faza == 2) {    //ищем день
         if (unique_end) break;
         if (symbol[0] == '.') faza++;       //нашли разделитель дня и месяца (точку) - переходим к извлечению месяца
-        else if (isDigit(symbol[0])) found_day = found_day*10 + (symbol[0] - '0');
+        else if (isDigit(symbol[0])) {
+          found_day = found_day*10 + (symbol[0] - '0');
+          if (found_day > day_month[found_month])  {
+            bot.editMessage(m_id, "Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!", chat);
+            return;
+          }
+        }
       }
 
       if (faza == 3) {    //ищем месяц
         if (isDigit(symbol[0])) {
           found_month = found_month*10 + (symbol[0] - '0');
+          if (found_month > 12)  {
+            bot.editMessage(m_id, "Значение месяца в сокращенном вводе некорректно: \"" + String(found_month) + "\"!", chat);
+            return;
+          }
         }
-        else if (found_month) faza = 4;
+        else if (found_month || i == condition.length()) faza = 4;
       }
 
       i += charLen; // увеличиваем i на длину символа
     }
 
-    if (faza == 2) {
+
+
+    //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
+
+    if (faza == 2) {      //указан только номер пары - значит Нка ставится сегодня
       if (unique_end) {
         if (condition.endsWith("вчера"))  found_day = real_time.day-1;
         else if (condition.endsWith("позавчера")) found_day = real_time.day-2;
@@ -87,16 +102,21 @@ void briefInput(Text message, String chat) {
       }
     }
 
-    if (found_month > 12 || found_month < 1)  bot.editMessage(m_id, "Значение месяца в сокращенном вводе некорректно (\"" + String(found_month) + "\")!", chat);
-    if (found_day > day_month[found_month] || found_day < 1)  bot.editMessage(m_id, "Значение дня в сокращенном вводе некорректно (\"" + String(found_day) + "\")!", chat);
-    //----------------------------------добавить проверку адекватности введенной пары----------------------------------
+    else if (faza == 3) {    //если указан только день - месяц воспринимаем как текущий
+      found_month = real_time.month;
+    }
 
-    if (faza != 4 && faza != 2) {
+    else if (faza != 4) {
       bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за " + DecodeReason(faza) + "!", chat);
       return;
     }
 
+    //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
+
+
+
     bot.sendMessage("пара: " + String(found_less) + "\nДата: " + String(found_day) + "." + String(found_month), error_chat);
+    timer.add(bot.lastBotMsg(), 15, chat);
   }
 
   else {                                 //Присваиваем данные текущего дня и пары, которая идет именно сейчас, если пользователь не указал эти данные явно (ввод без условия)
