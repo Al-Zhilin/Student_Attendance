@@ -134,7 +134,9 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем сокращенный ввод
+  FirebaseJson Nki_1, Nki_2;                                      //будем хранить будущие обьекты для запроса для обоих подгрупп
+
+  for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     Text dataa = message.getSub(i, "\n");
     bool surname_found = false;
     byte min_syntax_errors = 250;
@@ -144,7 +146,7 @@ void briefInput(Text message, String chat) {
       syntax_errors = 0;
       byte func_res = CheckSurnameMatch(dataa.toString(), students[ind].surname, &syntax_errors);
 
-      if (func_res == 1) {
+      if (func_res == 1) {       //если фамилия безошибочно найдена в списке фамилий
         //------------------Здесь вызываем функцию постановки Нки-----------------------------
         surname_found = true;
         break;
@@ -163,7 +165,7 @@ void briefInput(Text message, String chat) {
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
         bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_surname + "\"", error_chat);
         timer.add(bot.lastBotMsg(), 10, error_chat);
-        //------------------Здесь вызываем функцию постановки Нки-----------------------------
+        //------------------Здесь вызываем функцию постановки Нки-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
         surname_found = true;
       }
     }

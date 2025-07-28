@@ -404,7 +404,7 @@ class Sheet {
       return answ;
     }
 
-    void SetN(String range) {
+    void SetN(String range) {                       //базовая функция постановки Нок для одного человека в один день
       String answ = "";
       byte tries = 0;
 
