@@ -91,8 +91,8 @@ void briefInput(Text message, String chat) {
 
     if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
       if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
-        if (condition.endsWith("вчера"))  found_day = real_time.day-1;
-        else if (condition.endsWith("позавчера")) found_day = real_time.day-2;
+        if (condition.endsWith("позавчера"))  found_day = real_time.day-1;
+        else if (condition.endsWith("вчера")) found_day = real_time.day-2;
         else if (condition.endsWith("сегодня")) found_day = real_time.day;
         found_month = real_time.month;
       }
