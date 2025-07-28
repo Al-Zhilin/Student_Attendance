@@ -1,33 +1,29 @@
 void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0;
-  const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать межде значащими частями в сокращенном вводе
+  const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   int32_t m_id = 0;                        //Храним id сообщения, которое будет информировать пользователя о состоянии введенного им сокращенного ввода (принят/не принят, правильно введен/неправильно)
   String supp = "";
   FB_Time real_time = bot.getTime(3);
 
-  Text dataa = message.getSub(0, "\n");
-  for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) {             //ПЕРВАЯ строка сообщения - фамилия (сокращенный ввод без условия)
-    syntax_errors = 0;
-    if (CheckSurnameMatch(dataa.toString(), students[i].surname, &syntax_errors)) {
-      input_found = 1;
-      break;
-    }
-  }
+  for (int i = 0; i <= message.count("\n"); i++) {                  //цикл, каждый раз берем часть сообщения до перевода строки
+    Text dataa = message.getSub(i, "\n");                       //тут как раз и берем
 
-  if (!input_found) {
-    dataa = message.getSub(1, "\n"); 
-    for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) {           //ВТОРАЯ строка сообщения - фамилия (сокращенный с условием)
+    for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                //выискиваем среди всех фамилий нашу
       syntax_errors = 0;
-      if (CheckSurnameMatch(dataa.toString(), students[i].surname, &syntax_errors)) {
-        input_found = 2;
+      if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {
+        if (i == 0) input_found = 1;                      //если первая строка - фамилия = это сокращенный ввод без условия
+        else  input_found = 2;                            //иначе - это сокращенный ввод с условием
         break;
       }
     }
-    if (message.getSub(0, "\n").toString().toInt() == 0)  input_found = 1;                      //если первая строка не фамилия (проверили ранее) но и не условие - значит просто сильно опечатанная фамилия. Принимаем как сокр ввода без условия
+
+    if (input_found)  break;
   }
 
-  if (input_found == 0)  return;         //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
+  if (input_found == 2 && !isDigit((message.getSub(0, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
+
+  if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
   bot.sendMessage("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...", chat);
   timer.add(bot.lastBotMsg(), 15, chat);
@@ -87,7 +83,7 @@ void briefInput(Text message, String chat) {
 
 
     //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
-    if (faza == 2 && found_day) faza = 3;                 //фиксит случай "1 пара 20" (без точки на конце) - здесь надо сделать фазу = 3, т.к. не хватает месяца
+    if (faza == 2 && found_day) faza = 3;                 //фиксит случай "1 пара 20" (без точки на конце) - здесь надо сделать фазу = 3, т.к. не хватает только месяца
 
     if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
       if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
@@ -97,7 +93,7 @@ void briefInput(Text message, String chat) {
         found_month = real_time.month;
       }
 
-      else {
+      else {                                                                        //не имеет на конце специальных слов
         found_day = real_time.day;
         found_month = real_time.month;
       }
@@ -107,8 +103,8 @@ void briefInput(Text message, String chat) {
       found_month = real_time.month;
     }
 
-    else if (faza != 4) {
-      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за " + DecodeReason(faza) + "!", chat);
+    else if (faza == 1) {
+      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!", chat);
       return;
     }
 
@@ -178,22 +174,4 @@ void briefInput(Text message, String chat) {
   }
 
   bot.editMessage(m_id, F("Сокращенный ввод обработан!"));
-}
-
-String DecodeReason(byte faza) {                      //удобно возвращает текстовое представление фазы при парсинге условия в сокращенном вводе, в нужном падеже
-  switch (faza) {
-    case 0:
-      return "неправильно заданной пары";
-      break;
-    
-    case 1:
-      return "некорректной записи слова \"пара\"";
-      break;
-
-    default:
-      return "неправильно указанной даты";
-      break;
-  }
-
-  return "";
 }
