@@ -46,6 +46,7 @@ void briefInput(Text message, String chat) {
       else if ((c & 0xE0) == 0xC0) charLen = 2; // 2-byte UTF-8
       else if ((c & 0xF0) == 0xE0) charLen = 3; // 3-byte UTF-8 (на всяяякииийй)
       String symbol = condition.substring(i, i + charLen);
+      i += charLen; // увеличиваем i на длину символа
 
       if (faza == 0) {    //ищем номер пары
         //----------------------------------добавить проверку адекватности введенной пары----------------------------------
@@ -78,18 +79,18 @@ void briefInput(Text message, String chat) {
             return;
           }
         }
-        else if (found_month || i == condition.length()) faza = 4;
-      }
 
-      i += charLen; // увеличиваем i на длину символа
+        if (i == condition.length() && found_month) faza = 4;
+      }
     }
 
 
 
     //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
+    if (faza == 2 && found_day) faza = 3;                 //фиксит случай "1 пара 20" (без точки на конце) - здесь надо сделать фазу = 3, т.к. не хватает месяца
 
-    if (faza == 2) {      //указан только номер пары - значит Нка ставится сегодня
-      if (unique_end) {
+    if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
+      if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
         if (condition.endsWith("вчера"))  found_day = real_time.day-1;
         else if (condition.endsWith("позавчера")) found_day = real_time.day-2;
         else if (condition.endsWith("сегодня")) found_day = real_time.day;

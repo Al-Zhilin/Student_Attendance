@@ -321,7 +321,10 @@ class Sheet {
           else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_day-=4;
           else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_day-=5;
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_day-=6;
-          else bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\n" + answer.toString(), Admins[0]);
+          else {
+            bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\nОтвет от Sheet: \"" + answer.toString() + "\"", Admins[0]);
+            ESP.restart();
+          }
         }
         //----------------------Дата понедельника этой недели---------------------------
 
