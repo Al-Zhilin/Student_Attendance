@@ -49,7 +49,7 @@ byte offset[] = {23, 24};                                                       
 
 FastBot bot(BOT_TOKEN);
 
-byte week_off = 14;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
+byte week_off = 24;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
 bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
@@ -977,7 +977,7 @@ void setup() {
   EEPROM.begin(20);                                                           //инициализируем память для EEPROM
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  EEPROM_START();                                                             //подтягиваем из памяти все значения
+  //EEPROM_START();                                                             //подтягиваем из памяти все значения
 
   bot.clearServiceMessages(true);
   ArduinoOTA.setHostname(OTA_NAME);

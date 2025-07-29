@@ -134,7 +134,7 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  FirebaseJson Nki_1, Nki_2;                                      //будем хранить будущие обьекты для запроса для обоих подгрупп
+  FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обоих подгрупп
 
   for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     Text dataa = message.getSub(i, "\n");
