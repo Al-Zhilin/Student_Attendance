@@ -110,10 +110,6 @@ void briefInput(Text message, String chat) {
 
     //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
 
-
-
-    bot.sendMessage("пара: " + String(found_less) + "\nДата: " + String(found_day) + "." + String(found_month), error_chat);
-    timer.add(bot.lastBotMsg(), 15, chat);
   }
 
   else {                                 //Присваиваем данные текущего дня и пары, которая идет именно сейчас, если пользователь не указал эти данные явно (ввод без условия)
@@ -135,8 +131,19 @@ void briefInput(Text message, String chat) {
   }
 
   FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обеих подгрупп
-  for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе
-    nki_array[i].add("range", range);
+  bool need_post[2] = {false, false};                             //нужно ли отправлять документ для конкретной подгруппы, другими словами есть ли Нки в ней для постановки
+  nka.surn = "";
+  nka.day = found_day;
+  nka.month = found_month;
+  String range[2] = {Sheet1, Sheet2};
+
+  for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе. В дальнейшем будем заменять некоторые позиции на фамилии
+    nka.subgroup = i;
+    getNIndex();
+    range[i] += nka.posC;
+    range[i] += nka.posI;
+
+    nki_array[i].add("range", range[i]);
     nki_array[i].add("majorDimension", "COLUMNS");
     for (byte j = 0; j < people_in_subgr[i]; j++) {
       String address = "values/[0]/[";
@@ -148,16 +155,22 @@ void briefInput(Text message, String chat) {
 
   for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     Text dataa = message.getSub(i, "\n");
+    byte surname_length[2] = {};                                                //количество фамилий этой подгруппы перед найденной. Нужно для вставки фамилии в документе на правильное место
+
     bool surname_found = false;
     byte min_syntax_errors = 250;
     String assumed_surname = "";
+    String address = "values/[0]/[";
 
-    for (int ind = 0; ind < sizeof(students)/sizeof(students[0]); ind++) {
+    for (int ind = 0; ind < sizeof(students)/sizeof(students[0]); ind++) {      //цикл перебирает все фамилии по списку и сравнивает с введенной
       syntax_errors = 0;
       byte func_res = CheckSurnameMatch(dataa.toString(), students[ind].surname, &syntax_errors);
 
       if (func_res == 1) {       //если фамилия безошибочно найдена в списке фамилий
-        //------------------Здесь вызываем функцию постановки Нки-----------------------------
+        //------------------Здесь ставим Нку нужному человеку-----------------------------
+        address += surname_length[students[ind].subgroup];
+        address += "]";
+        nki_array[students[ind].subgroup].set(address, "D");
         surname_found = true;
         break;
       }
@@ -175,9 +188,14 @@ void briefInput(Text message, String chat) {
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
         bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_surname + "\"", error_chat);
         timer.add(bot.lastBotMsg(), 10, error_chat);
-        //------------------Здесь вызываем функцию постановки Нки-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
+        //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
+        address += surname_length[students[ind].subgroup];
+        address += "]";
+        nki_array[students[ind].subgroup].set(address, "D");
         surname_found = true;
       }
+
+      surname_length[students[ind].subgroup]++;         //см. описание к переменной выше
     }
     if (!surname_found) {
       bot.sendMessage("Неизвестная фамилия: " + String(dataa) + "!", chat);
@@ -185,5 +203,17 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  bot.editMessage(m_id, F("Сокращенный ввод обработан!"));
+  for (byte i = 0; i < 2; i++) {
+    byte tries = 0;
+    String answ = "";
+
+    while (!GSheet.values.update(&answ, spreadsheetId, range[i], &nki_array[i]) && tries < SetTryNum) {
+      tries++;
+    }
+  
+    nki_array[i].clear();
+    if (tries == SetTryNum) bot.sendMessage("ErrorSendrequest!", chat);
+  }
+
+  bot.editMessage(m_id, F("Сокращенный ввод обработан!"), chat);
 }

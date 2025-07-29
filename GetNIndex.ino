@@ -1,49 +1,57 @@
-void getNIndex(bool subgr) {
+void getNIndex() {
   byte weeks_ago = 0, days_ago = 0;
   int diff = 0;
   
-  if (week[subgr]->pon_month == nka.month) {
-    if (nka.day == week[subgr]->pon_day) {
+  if (week[nka.subgroup]->pon_month == nka.month) {
+    if (nka.day == week[nka.subgroup]->pon_day) {
       weeks_ago = 0;
       days_ago = 0;
     }
 
-    else if (nka.day > week[subgr]->pon_day) {
+    else if (nka.day > week[nka.subgroup]->pon_day) {
       weeks_ago = 0;
-      days_ago = nka.day - week[subgr]->pon_day;
+      days_ago = nka.day - week[nka.subgroup]->pon_day;
     }
 
-    else if (nka.day < week[subgr]->pon_day) {
-      diff = week[subgr]->pon_day - nka.day;
+    else if (nka.day < week[nka.subgroup]->pon_day) {
+      diff = week[nka.subgroup]->pon_day - nka.day;
       weeks_ago = (diff + 6) / 7;
       if (diff % 7 != 0) days_ago = 7 - (diff % 7);
     }
   }
 
-  else if (nka.month < week[subgr]->pon_month) {
+  else if (nka.month < week[nka.subgroup]->pon_month) {
     int d = 0;
-    for (byte i = nka.month+1; i < week[subgr]->pon_month; i++) {
+    for (byte i = nka.month+1; i < week[nka.subgroup]->pon_month; i++) {
       d += day_month[i - 1];
     }
-    diff = (week[subgr]->pon_day + day_month[nka.month-1]) - nka.day + d;
+    diff = (week[nka.subgroup]->pon_day + day_month[nka.month-1]) - nka.day + d;
     weeks_ago = (diff + 6) / 7;
     if (diff % 7 != 0) days_ago = 7 - (diff % 7);
   }
 
-  else if (nka.month > week[subgr]->pon_month) {
+  else if (nka.month > week[nka.subgroup]->pon_month) {
     weeks_ago = 0;
-    days_ago = (day_month[week[subgr]->pon_month-1] + nka.day) - week[subgr]->pon_day;
+    days_ago = (day_month[week[nka.subgroup]->pon_month-1] + nka.day) - week[nka.subgroup]->pon_day;
   }
 
   byte k = 0;
   bool found = false;
-  for (int i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
-    if (students[i].surname == nka.surn)  {
-      found = true;
-      nka.posI = (people_list_i + (offset[subgr] * (week_off-1 - weeks_ago))) + k;
-      break;
+
+  if (nka.surn == "")  {
+    nka.posI = (people_list_i + (offset[nka.subgroup] * (week_off-1 - weeks_ago)));
+    found = true;
+  }
+
+  else {
+    for (int i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
+      if (students[i].surname == nka.surn)  {
+        found = true;
+        nka.posI = (people_list_i + (offset[nka.subgroup] * (week_off-1 - weeks_ago))) + k;
+        break; 
+      }
+      if (students[i].subgroup == nka.subgroup) k++;
     }
-    if (students[i].subgroup == nka.subgroup) k++;
   }
 
   if (!found) {
@@ -59,12 +67,12 @@ void getNIndex(bool subgr) {
   bool prev = true;
 
   for (int i = 0; i < days_ago; i++) {
-    if (week[subgr + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i] == 0) continue;
+    if (week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i] == 0) continue;
 
     if (prev) sm++;
     prev = true;
 
-    sm += week[subgr + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i];
+    sm += week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i];
   }
   
   nka.posC = charOffset(String(people_list_c), sm);

@@ -149,7 +149,6 @@ void checkYear() {
   else day_month[1] = 28;
 }
 
-
 struct timer_data {
   uint32_t start_millis = 0;
   int32_t message_id = 0;
@@ -596,7 +595,7 @@ class Menu {
 
           else if (comm == "Поставить") {
             String range;
-            getNIndex(nka.subgroup);
+            getNIndex();
             if (!nka.subgroup) range += Sheet1;
             else range += Sheet2;
             range += nka.posC;
@@ -779,7 +778,7 @@ class Menu {
           mess += nka.year[2];
           mess += nka.year[3];
           mess += "\n";
-          getNIndex(nka.subgroup);
+          getNIndex();
           byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);                               //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
           if (week[week_index]->subj_num[nka.dayWeek-1])  {               //если в этот день пары есть (в день, соответственной Нке по четности, недели)
             if (reading_flag) {
@@ -871,12 +870,12 @@ class Menu {
           byte day_n = nka.day;                   
           byte dayWeek_n = nka.dayWeek;
           nka.day = k;
-          getNIndex(nka.subgroup);
+          getNIndex();
           byte pre_offset = nka.dayWeek-1;
           byte post_offset;
           if (nka.month == t.month) nka.day = day_n;
           else  nka.day = day_month[nka.month-1];
-          getNIndex(nka.subgroup);
+          getNIndex();
           post_offset = 7 - nka.dayWeek;
           nka.day = day_n;
           nka.dayWeek = dayWeek_n;
