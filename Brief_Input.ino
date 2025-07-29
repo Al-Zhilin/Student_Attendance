@@ -134,7 +134,17 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обоих подгрупп
+  FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обеих подгрупп
+  for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе
+    nki_array[i].add("range", range);
+    nki_array[i].add("majorDimension", "COLUMNS");
+    for (byte j = 0; j < people_in_subgr[i]; j++) {
+      String address = "values/[0]/[";
+      address += j;
+      address += "]";
+      nki_array[i].set(address, "");
+    }
+  }
 
   for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     Text dataa = message.getSub(i, "\n");

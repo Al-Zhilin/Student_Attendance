@@ -826,22 +826,13 @@ class Menu {
 
         case 2: {
           mess = "";
-          if (semestr) {
-            for (int i = START_MONTH; i < t.month+1; i++) {
-              mess += months[i-1];
-              if (i % 3 == 1 || i == t.month) mess += "\n";
-              else mess += "\t";
-            }
-          }
 
-          if (!semestr) {
-            for (int i = START_MONTH; i < t.month+1; i++) {
-              mess += months[i-1];
-              if (i % 3 == 1 || i == t.month) mess += "\n";
-              else mess += "\t";
-            }
+          for (int i = START_MONTH; i < t.month+1; i++) {
+            mess += months[i-1];
+            if (i % 3 == 1 || i == t.month) mess += "\n";
+            else mess += "\t";
           }
-
+          
           mess += "Назад\tНа главную"; 
         
         }
@@ -977,7 +968,7 @@ void setup() {
   EEPROM.begin(20);                                                           //инициализируем память для EEPROM
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  //EEPROM_START();                                                             //подтягиваем из памяти все значения
+  EEPROM_START();                                                             //подтягиваем из памяти все значения
 
   bot.clearServiceMessages(true);
   ArduinoOTA.setHostname(OTA_NAME);
