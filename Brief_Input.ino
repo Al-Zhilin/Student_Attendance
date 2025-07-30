@@ -3,7 +3,6 @@ void briefInput(Text message, String chat) {
   byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0;
   const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   int32_t m_id = 0;                        //Храним id сообщения, которое будет информировать пользователя о состоянии введенного им сокращенного ввода (принят/не принят, правильно введен/неправильно)
-  byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);        //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
   String supp = "";
   FB_Time real_time = bot.getTime(3);
 
@@ -132,7 +131,7 @@ void briefInput(Text message, String chat) {
 
   FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обеих подгрупп
 
-  bool need_post[2] = {false, false};                             //нужно ли отправлять документ для конкретной подгруппы, существует ли пара, куда мы хотим ставить пропуски
+  bool need_post[2] = {false, false};                             //есть ли пропуски у людей этой продгруппы. Если нет - то и смысла отправлять запрос в будущем нету
   bool valid_lesson[2] = {false, false};                          //есть ли вообще в этот день у данной подгруппы эта пара? (да, мне показалось здесь самое время это проверить :) )
   byte lesson_length[2] = {};                                     //отображает, какая пара для выставления по счету в это день. (Счет всегда с 1, вот номер пары может быть 1)
   nka.surn = "";
@@ -143,6 +142,8 @@ void briefInput(Text message, String chat) {
   for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе. В дальнейшем будем заменять некоторые позиции на фамилии. Гарантирует 'неразрывность' JSON документа
     nka.subgroup = i;
     getNIndex();
+    byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);        //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
+    
     for (byte day_iter = 0; day_iter < week[week_index]->subj_num[nka.dayWeek-1]; day_iter++) {
       if (week[week_index]->less_nums[nka.dayWeek-1][day_iter] == found_less)  {
         valid_lesson[i] = true;
@@ -221,16 +222,14 @@ void briefInput(Text message, String chat) {
   }
 
   for (byte i = 0; i < 2; i++) {
-    if (!need_post[i])  {
+    if (!need_post[i] || !valid_lesson[i])  {
       nki_array[i].clear();
-      continue;                   //если Нок для выставления в этой подгруппе - просто пропускаем высталение этой подгруппы
-    }
 
-    if (!valid_lesson[i]) {
-      bot.sendMessage("В данный день у " + String((!i) ? "первой" : "второй") + " подгруппы нет пары под номером " + String(found_less) + "!\nВыставление пропусков студентам этой подгруппы невозможно!", chat);
-      timer.add(bot.lastBotMsg(), 20, chat);
-      nki_array[i].clear();
-      continue;                   //если пары в этот день у этой подгруппы не существует - выводим сообщение и пропускаем эту подгруппу
+      if (!valid_lesson[i]) {
+        bot.sendMessage("В данный день у " + String((!i) ? "1" : "2") + " подгруппы нет пары под номером " + String(found_less) + "!\nВыставление пропусков студентам этой подгруппы невозможно!", chat);
+        timer.add(bot.lastBotMsg(), 20, chat);
+      }
+      continue;
     }
 
     byte tries = 0;

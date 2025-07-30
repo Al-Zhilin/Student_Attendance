@@ -24,8 +24,8 @@
 
 //--------------------------------------ОФФСЕТЫ--------------------------------------------------------------------------------------------------------------------------------------------------------------
 byte offset[] = {23, 24};                                                                        //смещение (в количестве строк) между одними и теми же данными, в неделях, различающийся по номеру на 1, для каждого листа (подгруппы)
-#define r_count 11                                                                               //количество " , до первого значения из ячейки в массиве мусора и угара от библиотеки 
-#define r_offset 2                                                                               //сдвиг в количестве " в том же мусоре от библы, для получения следующего значения из массива
+#define r_count 11                                                                               //количество " , до первого значения из ячейки в массиве мусора и угара от библиотеки, при получении JSON как String
+#define r_offset 2                                                                               //сдвиг в количестве " в том же мусоре от библы, для получения следующего значения из массива, при получении JSON как String
 //--------------------------------------ОФФСЕТЫ--------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -55,7 +55,7 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};       //пока не придумал, как грумотно скрыть и использовать, не обьявляя прототипы классов. Пускай побудет так :)
 
-const String months[] = {
+const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
   "Фев",
   "Мар",
@@ -70,7 +70,7 @@ const String months[] = {
   "Дек",
 };
 
-byte day_month[] = {
+byte day_month[] = {        //количество дней в каждом месяце года. Для високосного есть отдельная функция
   31,
   28,
   31,
@@ -101,7 +101,7 @@ String PROGMEM DaysOfWeek[] = {
 };
 
 
-struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки
+struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
   String nki;           //строка, в которой каждый символ это либо " " либо "Н", соответственно каждой паре выбранного дня
   byte month;           //номер месяца
@@ -111,8 +111,6 @@ struct SetInfo {      //структура с данными, нужными д�
   String posC;          //символьная составлющая координаты ячейки
   int posI;             //численная составляющая координаты ячейки
   bool subgroup;        //подгруппа (false/true, 1/2 соответственно)
-  String c;             //символьная составляющая ячейки с первой нкой
-  int i;                //численная составляющая ячейки с первой нкой
   bool parity;          //четность/нечетность (0/1 соответственно) недели, в которой ставим Нку
 } nka;
 
@@ -411,7 +409,7 @@ class Sheet {
       valueRange.add("range", range);
       valueRange.add("majorDimension", "ROWS");
 
-      for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) {
+      for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) {
         String address = "values/[0]/[", data = "";
         address += i;
         address += "]";
@@ -533,8 +531,8 @@ class Menu {
           nka.day = t.day;
           nka.year = t.year;
           nka.dayWeek = t.dayWeek;
-          nka.c = 'A';
-          nka.i = 0;
+          nka.posC = 'A';
+          nka.posI = 0;
           for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
             if (comm == students[i].surname)  {
               nka.surn = students[i].surname;
@@ -559,8 +557,8 @@ class Menu {
           }
 
           else if (comm.startsWith("(")) {
-            for (byte i = 0; i < week[nka.subgroup]->subj_num[nka.dayWeek-1]; i++) {
-              if (String(comm[1]) == String(week[nka.subgroup]->less_nums[nka.dayWeek-1][i])) {
+            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) {
+              if (String(comm[1]) == String(week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->less_nums[nka.dayWeek-1][i])) {
                 edit_page(4);
                 way = "011111";
                 nka_ind = i;
@@ -595,13 +593,13 @@ class Menu {
 
           else if (comm == "Поставить") {
             String range;
-            getNIndex();
+            getNIndex();                              //подумать, нужно ли оно тут
             if (!nka.subgroup) range += Sheet1;
             else range += Sheet2;
             range += nka.posC;
             range += nka.posI;
             range += ":";
-            range += charOffset(nka.posC, week[nka.subgroup]->subj_num[nka.dayWeek-1]-1);
+            range += charOffset(nka.posC, week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]-1);
             range += nka.posI;
             list.SetN(range);
             way = "01";
@@ -685,8 +683,8 @@ class Menu {
           nka.day = t.day;
           nka.year = t.year;
           nka.dayWeek = t.dayWeek;
-          nka.c = 'A';
-          nka.i = 0;
+          nka.posC = 'A';
+          nka.posI = 0;
           byte l = 0;
           for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
             if (comm == students[i].surname)  {
@@ -801,7 +799,7 @@ class Menu {
               }
             }
 
-            for (byte i = 0; i < week[week_index]->subj_num[nka.dayWeek-1]; i++) {             //отображать бужем пары, которые есть в день, когда Нки будем ставить
+            for (byte i = 0; i < week[week_index]->subj_num[nka.dayWeek-1]; i++) {             //отображать будем пары, которые есть в день, когда Нки будем ставить
               mess += "(";
               mess += week[week_index]->less_nums[nka.dayWeek-1][i];
               mess += ") ";
@@ -969,18 +967,18 @@ void setup() {
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
   EEPROM_START();                                                             //подтягиваем из памяти все значения
 
-  bot.clearServiceMessages(true);
-  ArduinoOTA.setHostname(OTA_NAME);
-  ArduinoOTA.setPassword(OTA_PASS);
+  bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
+  ArduinoOTA.setHostname(OTA_NAME);                                           //имя для точки OTA обновления
+  ArduinoOTA.setPassword(OTA_PASS);                                           //пароль
   ArduinoOTA.begin();
 
   for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе самым изощренным способом
 
-  menu.start_page(0);       //чисто для обновления времени
+  menu.start_page(0);       //чисто для обновления структуры FB_Time
   list.begin();
-  menu.start_page(1);       //вот тут уже достраиваем стартовую страницу окончательно
-  checkYear();
-  editServiceMess("");
+  menu.start_page(1);       //вот тут уже отсылаем менюшку
+  checkYear();              //проверяем год на високосность
+  editServiceMess("");            //стираем все приколюхи в статусном сообщении после всех begin`ов
 }
 
 void loop() {

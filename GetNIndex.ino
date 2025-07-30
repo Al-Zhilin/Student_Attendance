@@ -64,14 +64,10 @@ void getNIndex() {
   nka.dayWeek = days_ago+1;
 
   int sm = 1;
-  bool prev = true;
 
   for (int i = 0; i < days_ago; i++) {
     if (week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i] == 0) continue;
-
-    if (prev) sm++;
-    prev = true;
-
+    sm++;
     sm += week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[i];
   }
   
