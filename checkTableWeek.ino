@@ -216,7 +216,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   editServiceMess("Достроено " + String(weeksToBuild) + " недель!");
   file.week_off += weeksToBuild;
-  //EEPROM_PUT(0, file.week_off);
+  settings_file.update();
 
   if (weeksToBuild % 2 != 0) {                  //тогда меняем местами указатели. Настоящаая четность поменялась
     for (byte x = 0; x < 2; x++) {

@@ -934,7 +934,20 @@ void setup() {
   WiFi_Connect();                                                             //подключаемся к WiFi
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  //EEPROM_START();                                                             //подтягиваем из памяти все значения
+  FDstat_t file_stat = settings_file.read();                                  //читаем структуру из файла
+
+  switch (file_stat) {
+    case FD_FS_ERR: bot.sendMessage("FileSystemError!", error_chat);
+      break;
+    case FD_FILE_ERR: bot.sendMessage("OpenFileError!", error_chat);
+      break;
+    case FD_WRITE: Serial.println("Data Write");
+      break;
+    case FD_ADD: Serial.println("Data Add");
+      break;
+    default:
+      break;
+  }
 
   bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
   ArduinoOTA.setHostname(OTA_NAME);                                           //имя для точки OTA обновления
@@ -954,6 +967,7 @@ void loop() {
   static int old_year = 0;
   static byte old_day = 0;
   bot.tick();
+  settings_file.tick();
   timer.tick();
   ArduinoOTA.handle();
   FB_Time t = bot.getTime(3);
