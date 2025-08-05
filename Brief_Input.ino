@@ -129,6 +129,7 @@ void briefInput(Text message, String chat) {
     }
   }
 
+  uint32_t Heap = ESP.getFreeHeap();
   FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обеих подгрупп
 
   bool need_post[2] = {false, false};                             //есть ли пропуски у людей этой продгруппы. Если нет - то и смысла отправлять запрос в будущем нету
@@ -171,7 +172,8 @@ void briefInput(Text message, String chat) {
 
     bool surname_found = false;
     byte min_syntax_errors = 250;
-    String assumed_surname = "";
+    person assumed_people;                                                      //если фамилия с опечаткой - здесь будем хранить человека, наиболее подходящего
+    byte assumed_length = 0;
     String address = "values/[0]/[";
 
     for (int ind = 0; ind < sizeof(students)/sizeof(students[0]); ind++) {      //цикл перебирает все фамилии по списку и сравнивает с введенной
@@ -197,18 +199,20 @@ void briefInput(Text message, String chat) {
           break;
         }
         min_syntax_errors = syntax_errors;
-        assumed_surname = students[ind].surname;
+        assumed_people.surname = students[ind].surname;
+        assumed_people.subgroup = students[ind].subgroup;
+        assumed_length = surname_length[students[ind].subgroup];
       }
 
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
-        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_surname + "\"", error_chat);
+        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_people.surname + "\"", error_chat);
         timer.add(bot.lastBotMsg(), 10, error_chat);
         //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
         if (valid_lesson[students[ind].subgroup]) {
-          address += surname_length[students[ind].subgroup];
+          address += assumed_length;
           address += "]";
-          nki_array[students[ind].subgroup].set(address, "D");
-          need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          nki_array[assumed_people.subgroup].set(address, "D");
+          need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
         }
         surname_found = true;
       }
@@ -220,6 +224,8 @@ void briefInput(Text message, String chat) {
       timer.add(bot.lastBotMsg(), 10, chat);
     }
   }
+
+  Heap -= ESP.getFreeHeap();
 
   for (byte i = 0; i < 2; i++) {
     if (!need_post[i] || !valid_lesson[i])  {
@@ -240,8 +246,8 @@ void briefInput(Text message, String chat) {
     }
   
     nki_array[i].clear();
-    if (tries == SetTryNum) bot.sendMessage("ErrorSendrequest!", chat);
+    if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
   }
 
-  bot.editMessage(m_id, F("Сокращенный ввод обработан!"), chat);
+  bot.editMessage(m_id, "Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.", chat);
 }

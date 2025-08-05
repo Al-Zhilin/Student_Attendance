@@ -94,8 +94,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
       else
         request.set("copyPaste/source/sheetId", SHEET2_ID);
 
-      request.set("copyPaste/source/startRowIndex", (weekInfo_i + (offset[i] * (week_off - 2 + iter))) - 1);
-      request.set("copyPaste/source/endRowIndex", (people_list_i + (offset[i] * (week_off - 2 + iter)) + people_in_subgr[i] - 1));
+      request.set("copyPaste/source/startRowIndex", (weekInfo_i + (offset[i] * (file.week_off - 2 + iter))) - 1);
+      request.set("copyPaste/source/endRowIndex", (people_list_i + (offset[i] * (file.week_off - 2 + iter)) + people_in_subgr[i] - 1));
       request.set("copyPaste/source/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
       request.set("copyPaste/source/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
 
@@ -104,8 +104,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
       else
         request.set("copyPaste/destination/sheetId", SHEET2_ID);
 
-      request.set("copyPaste/destination/startRowIndex", (weekInfo_i + (offset[i] * (week_off + iter)) - 1));
-      request.set("copyPaste/destination/endRowIndex", (people_list_i + (offset[i] * (week_off + iter)) + people_in_subgr[i] - 1));
+      request.set("copyPaste/destination/startRowIndex", (weekInfo_i + (offset[i] * (file.week_off + iter)) - 1));
+      request.set("copyPaste/destination/endRowIndex", (people_list_i + (offset[i] * (file.week_off + iter)) + people_in_subgr[i] - 1));
       request.set("copyPaste/destination/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
       request.set("copyPaste/destination/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
 
@@ -123,8 +123,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
       else
         request.set("repeatCell/range/sheetId", SHEET2_ID);
 
-      request.set("repeatCell/range/startRowIndex", (people_list_i + (offset[i] * (week_off + iter))) - 1);
-      request.set("repeatCell/range/endRowIndex", (people_list_i + (offset[i] * (week_off + iter)) + people_in_subgr[i] - 1));
+      request.set("repeatCell/range/startRowIndex", (people_list_i + (offset[i] * (file.week_off + iter))) - 1);
+      request.set("repeatCell/range/endRowIndex", (people_list_i + (offset[i] * (file.week_off + iter)) + people_in_subgr[i] - 1));
       request.set("repeatCell/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
       request.set("repeatCell/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
 
@@ -145,8 +145,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
       else
         request.set("updateCells/range/sheetId", SHEET2_ID);
       
-      request.set("updateCells/range/startRowIndex", (weekInfo_i + (offset[i] * (week_off + iter)) - 1));
-      request.set("updateCells/range/endRowIndex", (weekInfo_i + (offset[i] * (week_off + iter))));
+      request.set("updateCells/range/startRowIndex", (weekInfo_i + (offset[i] * (file.week_off + iter)) - 1));
+      request.set("updateCells/range/endRowIndex", (weekInfo_i + (offset[i] * (file.week_off + iter))));
       request.set("updateCells/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
       request.set("updateCells/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
 
@@ -215,8 +215,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
   
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   editServiceMess("Достроено " + String(weeksToBuild) + " недель!");
-  week_off += weeksToBuild;
-  EEPROM_PUT(0, week_off);
+  file.week_off += weeksToBuild;
+  //EEPROM_PUT(0, file.week_off);
 
   if (weeksToBuild % 2 != 0) {                  //тогда меняем местами указатели. Настоящаая четность поменялась
     for (byte x = 0; x < 2; x++) {

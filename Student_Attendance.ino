@@ -1,59 +1,28 @@
-#define ATOMIC_FS_UPDATE
+#define ATOMIC_FS_UPDATE      // поддержка сжатых прошивока из чата
 
 #include <FastBot.h>
+#include <FileData.h>
+#include <LittleFS.h>
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
-#include <EEPROM.h>
 #include <ArduinoOTA.h>
 #include "types.h"
-#include <passwords.h>
-
-//-------------------------------------НАСТРОЙКИ-------------------------------------------------------------------------------------------------------------------------------------------------------------
-#define WIFI_RES_PERIOD 1 * 60 * 1000                                                            //период ожидания подключения к WiFi, по истечении - перезагрузка
-#define START_MONTH 2                                                                            //месяц, с которого начинается учеба в семестре
-#define START_DAY 3                                                                              //дата понедельника в первой учебной неделе (даже если учеба фактически началась не в понедельник)
-#define Respect "✅"                                                                             //символ, соответствующий УП в меню
-#define Disrep "❌"                                                                              //символ, соответствующий неУП в меню
-#define GetTryNum 3                                                                              //количество попыток получить данные из таблицы, после них - вывод ошибки
-#define SetTryNum 3                                                                              //количество попыток отправить данные в таблицу, после них - вывод ошибки
-#define SerialDebug 0                                                                            //вкл/выкл (1/0 соответственно) отладка в Serial
-#define SURNAME_ERRORS_NUM 2                                                                     //количество допускаемых ошибок в фамилии при сокращенном вводе (количество посимвольных отличий между вводимой фамилией и соответствующей фамилией из списка)
-#define MINUTES_OFFSET 5                                                                         //Допустимый оффсет по времени, для определения, какая пара сейчас идет (позволяет определять, что сейчас идет N-ая пара, даже если сейчас часы_начала_пары:минуты_начала-<значение> или аналогично для конца пары)
-//-------------------------------------НАСТРОЙКИ-------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-//--------------------------------------ОФФСЕТЫ--------------------------------------------------------------------------------------------------------------------------------------------------------------
-byte offset[] = {23, 24};                                                                        //смещение (в количестве строк) между одними и теми же данными, в неделях, различающийся по номеру на 1, для каждого листа (подгруппы)
-#define r_count 11                                                                               //количество " , до первого значения из ячейки в массиве мусора и угара от библиотеки, при получении JSON как String
-#define r_offset 2                                                                               //сдвиг в количестве " в том же мусоре от библы, для получения следующего значения из массива, при получении JSON как String
-//--------------------------------------ОФФСЕТЫ--------------------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-//--------------------------------------РАЗНЫЕ КОНСТАНТЫ ТАБЛИЦЫ---------------------------------------------------------------------------------------------------------------------------------------------
-#define Sheet1 "People1!"                                                                         //имя листа, с данными о людях первой подгруппы
-#define Sheet2 "People2!"                                                                         //имя листа, с данными о людях второй подгруппы
-
-#define weekInfo_c 'B'                                                                            //информация из заглавной ячейки недели (данные ячейки)
-#define weekInfo_i 2
-
-#define less_num_c 'C'                                                                            //номер первой пары первого дня (данные ячейки)
-#define less_num_i 3
-
-#define less_name_c 'C'                                                                           //имя первой пары первого дня (данные ячейки)
-#define less_name_i 4
-
-#define people_list_c 'B'                                                                         //начало списка людей подгруппы (данные ячейки)
-#define people_list_i 6
-//--------------------------------------РАЗНЫЕ КОНСТАНТЫ ТАБЛИЦЫ---------------------------------------------------------------------------------------------------------------------------------------------
-
+#include <settings.h>
 
 FastBot bot(BOT_TOKEN);
-
-byte week_off = 24;                                                                               //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)                                                   
+                                                   
 bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
-int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};       //пока не придумал, как грумотно скрыть и использовать, не обьявляя прототипы классов. Пускай побудет так :)
+int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};       //пока не придумал, как грамотно скрыть и использовать, не обьявляя прототипы классов. Пускай побудет так :)
+
+struct fileData {               //структуры настроек, записывамых в энергонезависимую память
+  byte week_off = 24;           //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
+  byte users_num;
+
+} file;
+
+FileData settings_file(&LittleFS, "data.dat", 'A', &file, sizeof(file));
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -266,10 +235,10 @@ class Sheet {
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(file.week_off-parity_offset)));
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(file.week_off-parity_offset)));
         returned_string = this->getCells(range);
         Text answer(returned_string);
         Text ans = answer.getSub(r_count, "\"");
@@ -331,7 +300,7 @@ class Sheet {
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += less_num_c;
-        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(file.week_off-parity_offset)));
         range += ":";
 
         byte len = 0;
@@ -345,7 +314,7 @@ class Sheet {
         }
 
         range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(file.week_off-parity_offset)));
         returned_string = this->getCells(range);
         Text answa(returned_string);
 
@@ -429,7 +398,7 @@ class Sheet {
 
     void Counting() {
       if (!count.mode || count.mode == 1)  {         //все предметы УП (R) ИЛИ все предметы все Н
-        for (int i = 1; i < week_off+1; i++) {
+        for (int i = 1; i < file.week_off+1; i++) {
           String range = "";
           if (!count.subgroup)  range += Sheet1;
           else range += Sheet2;
@@ -961,11 +930,11 @@ void editServiceMess(String edit_text) {              //функция реда�
 
 void setup() {
   Serial.begin(115200);                                                       //последовательный порт аааткрывать
+  LittleFS.begin();
   WiFi_Connect();                                                             //подключаемся к WiFi
-  EEPROM.begin(20);                                                           //инициализируем память для EEPROM
   bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  EEPROM_START();                                                             //подтягиваем из памяти все значения
+  //EEPROM_START();                                                             //подтягиваем из памяти все значения
 
   bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
   ArduinoOTA.setHostname(OTA_NAME);                                           //имя для точки OTA обновления

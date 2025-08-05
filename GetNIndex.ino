@@ -39,7 +39,7 @@ void getNIndex() {
   bool found = false;
 
   if (nka.surn == "")  {
-    nka.posI = (people_list_i + (offset[nka.subgroup] * (week_off-1 - weeks_ago)));
+    nka.posI = (people_list_i + (offset[nka.subgroup] * (file.week_off-1 - weeks_ago)));
     found = true;
   }
 
@@ -47,7 +47,7 @@ void getNIndex() {
     for (int i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
       if (students[i].surname == nka.surn)  {
         found = true;
-        nka.posI = (people_list_i + (offset[nka.subgroup] * (week_off-1 - weeks_ago))) + k;
+        nka.posI = (people_list_i + (offset[nka.subgroup] * (file.week_off-1 - weeks_ago))) + k;
         break; 
       }
       if (students[i].subgroup == nka.subgroup) k++;
