@@ -1,8 +1,8 @@
-#define ATOMIC_FS_UPDATE      // поддержка сжатых прошивока из чата
+#define ATOMIC_FS_UPDATE      // поддержка сжатых прошивок из чата
 
 #include <FastBot.h>
 #include <FileData.h>
-#include <LittleFS.h>
+#include <FFat.h>
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
 #include <ArduinoOTA.h>
@@ -11,18 +11,17 @@
 
 FastBot bot(BOT_TOKEN);
                                                    
-bool semestr = true;                                                                              //осенний/летний семестр (false/true)
 float Version = 0.5;                                                                              //текущая версия прошивки
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
-int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};       //пока не придумал, как грамотно скрыть и использовать, не обьявляя прототипы классов. Пускай побудет так :)
 
-struct fileData {               //структуры настроек, записывамых в энергонезависимую память
-  byte week_off = 24;           //номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
-  byte users_num;
+struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
+  byte week_off = 24;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
+  int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
+  int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
-} file;
+} file_data;
 
-FileData settings_file(&LittleFS, "data.dat", 'A', &file, sizeof(file));
+FileData settings_file(&FFat, "/data.dat", 'A', &file_data, sizeof(file_data));
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -95,7 +94,7 @@ struct WeekInfo {
 
 WeekInfo *week[4] = {&week_object[0], &week_object[1], &week_object[2], &week_object[3]};           //week[4] - массив указателей на обьекты структуры WeekInfo. 0 и 1 - для настоящей четности, а 2 и 3 - для противоположной у обоих подгрупп
 
-struct CoutntInfo {
+struct CountInfo {
   String surn;
   int surn_ind;
   int total;
@@ -235,10 +234,10 @@ class Sheet {
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset[i % 2]*(file.week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i % 2]*(file.week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
         returned_string = this->getCells(range);
         Text answer(returned_string);
         Text ans = answer.getSub(r_count, "\"");
@@ -300,7 +299,7 @@ class Sheet {
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += less_num_c;
-        range += (less_num_i + (offset[i % 2]*(file.week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
         range += ":";
 
         byte len = 0;
@@ -314,7 +313,7 @@ class Sheet {
         }
 
         range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset[i % 2]*(file.week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
         returned_string = this->getCells(range);
         Text answa(returned_string);
 
@@ -398,7 +397,7 @@ class Sheet {
 
     void Counting() {
       if (!count.mode || count.mode == 1)  {         //все предметы УП (R) ИЛИ все предметы все Н
-        for (int i = 1; i < file.week_off+1; i++) {
+        for (int i = 1; i < file_data.week_off+1; i++) {
           String range = "";
           if (!count.subgroup)  range += Sheet1;
           else range += Sheet2;
@@ -430,31 +429,35 @@ class Sheet {
 
 class Menu {
   private:
-    int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
     String s_menu[2] = {"Редактировать", "Подсчитать"};
     String way = "10000";
 
   public:
-    void start_page(bool mode) {
+    void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {              // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
       if (way == "10000") way = "0";
 
       if (!mode)  {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-          bot.sendMessage("______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[i]);
-          status_mess[i] = bot.lastBotMsg();
+          if (file_status == FD_WRITE || file_status == FD_ADD) {
+            bot.sendMessage("______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[i]);
+            file_data.status_mess[i] = bot.lastBotMsg();
+          }
+          else bot.editMessage(file_data.status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[0]);
         }
+        settings_file.update();
         return;
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        if (menu_id[i]) bot.editMenu(menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
-        else {
+        if (file_status == FD_WRITE || file_status == FD_ADD) {
           bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1], Admins[i]);
-          menu_id[i] = bot.lastBotMsg();
+          file_data.menu_id[i] = bot.lastBotMsg();
         }
+        else  bot.editMenu(file_data.menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
       }
+      settings_file.update();
     }
 
     friend void editServiceMess(String edit_text);              //функция редактирования "статусного" сообщения
@@ -676,8 +679,8 @@ class Menu {
 
         if (way == "021") {
           if (comm == "Общее УП") count.mode = 0;
-          else if (comm == "Общее все Н") count.mode = 1;
-          else if (comm == "По предметам") {
+          else if (comm == "Общее неУП") count.mode = 1;
+          else if (comm == "По предметам (неУП)") {
             count.mode = 2;
             way = "02111";
             calculate_page(2);
@@ -874,7 +877,7 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMenu(menu_id[i], mess, Admins[i]);
+        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
       }
     }
 
@@ -895,7 +898,7 @@ class Menu {
           mess = "";
           mess += count.surn;
           mess += "\n";
-          mess += "Общее УП\tОбщее все Н\tПо предметам\n";
+          mess += "Общее УП\tОбщее неУП\tПо предметам (неУП)\n";
           mess += "Назад\tНа главную";
         break;
 
@@ -917,35 +920,33 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMenu(menu_id[i], mess, Admins[i]);
+        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
       }
     }
 } menu;
 
 void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщения
   for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-    bot.editMessage(status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
+    bot.editMessage(file_data.status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
   }
 }
 
 void setup() {
-  Serial.begin(115200);                                                       //последовательный порт аааткрывать
-  LittleFS.begin();
-  WiFi_Connect();                                                             //подключаемся к WiFi
-  bot.attach(newMsg);                                                         //подключаем обработчик входящих сообщений
-  bot.setPeriod(50);                                                          //период между проверками входящих сообщений
-  FDstat_t file_stat = settings_file.read();                                  //читаем структуру из файла
+  Serial.begin(115200);                                                         // последовательный порт аааткрывать
+  WiFi_Connect();                                                               // подключаемся к WiFi
+  bot.attach(newMsg);                                                           // подключаем обработчик входящих сообщений
+  bot.setPeriod(50);                                                            // период между проверками входящих сообщений
+
+  if (!FFat.begin()) {                                                          // подключаем файловую систему
+    bot.sendMessage(F("Ошибка инициализации файловой системы!"), error_chat);
+  }
+  settings_file.addWithoutWipe(true);
+  FDstat_t file_stat = settings_file.read();                                    // читаем структуру из файла
 
   switch (file_stat) {
-    case FD_FS_ERR: bot.sendMessage("FileSystemError!", error_chat);
+    case FD_FS_ERR: bot.sendMessage(F("FileSystemError!"), error_chat);
       break;
-    case FD_FILE_ERR: bot.sendMessage("OpenFileError!", error_chat);
-      break;
-    case FD_WRITE: Serial.println("Data Write");
-      break;
-    case FD_ADD: Serial.println("Data Add");
-      break;
-    default:
+    case FD_FILE_ERR: bot.sendMessage(F("OpenFileError!"), error_chat);
       break;
   }
 
@@ -956,9 +957,9 @@ void setup() {
 
   for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе самым изощренным способом
 
-  menu.start_page(0);       //чисто для обновления структуры FB_Time
+  menu.start_page(0, file_stat);       //чисто для обновления структуры FB_Time
   list.begin();
-  menu.start_page(1);       //вот тут уже отсылаем менюшку
+  menu.start_page(1, file_stat);       //вот тут уже отсылаем менюшку
   checkYear();              //проверяем год на високосность
   editServiceMess("");            //стираем все приколюхи в статусном сообщении после всех begin`ов
 }
