@@ -474,14 +474,14 @@ class Menu {
         ret_command = true;
       }
 
-      if (way == "0") {                   //отображается стартовая страница
-        if (comm == s_menu[0]) {          //нажали кнопку "Редактирование"
+      if (way == "0") {                   // отображается стартовая страница
+        if (comm == s_menu[0]) {          // нажали кнопку "Редактирование"
           way = "01";
           edit_page(0);
           return;
         }
 
-        if (comm == s_menu[1]) {      //нажали кнопку "Подсчет"
+        if (comm == s_menu[1]) {          // нажали кнопку "Подсчет"
           way = "02";
           calculate_page(0);
           return;
@@ -495,8 +495,8 @@ class Menu {
         else  bot.sendMessage("err_menu", error_chat);
       }
 
-      if (way.startsWith("01")) {                                                     //ветка редактирования 
-        if (way == "01") {                                                            //отображается страница выбора фамилии
+      if (way.startsWith("01")) {                                                     // ветка редактирования 
+        if (way == "01") {                                                            // отображается страница выбора фамилии
           nka.surn = "";
           nka.nki = "";
           nka.month = t.month;
@@ -521,14 +521,14 @@ class Menu {
           }
         }
 
-        else if (way == "011") {                                                           //возможность поставить Н, или перейти к выбору другой даты
+        else if (way == "011") {                                                       // возможность поставить Н, или перейти к выбору другой даты
           if (comm.startsWith("Дата:")) {
             way = "0111";
             edit_page(2);
             return;
           }
 
-          else if (comm.startsWith("(")) {
+          else if (comm.startsWith("(")) {                                             // если пользователь нажал на конкретную пару в дне
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) {
               if (String(comm[1]) == String(week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->less_nums[nka.dayWeek-1][i])) {
                 edit_page(4);
@@ -539,7 +539,7 @@ class Menu {
             }
           }
 
-          else if (comm == "Все УП") {
+          else if (comm == "Все УП") {                                                 // выбрал "поставить УП на все пары в дне"
             nka.nki = "";
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '+';
             reading_flag = false;
@@ -547,7 +547,7 @@ class Menu {
             return;
           }
 
-          else if (comm == "Все неУП") {
+          else if (comm == "Все неУП") {                                               // выбрал "поставить неУП на все пары в дне"
             nka.nki = "";
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '-';
             reading_flag = false;
@@ -555,7 +555,7 @@ class Menu {
             return;
           }
 
-          else if (comm == "Нет пропусков") {
+          else if (comm == "Нет пропусков") {                                          // выбрал "убрать пропуски на всех парах в дне"
             nka.nki = "";
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += ' ';
             reading_flag = false;
@@ -563,7 +563,7 @@ class Menu {
             return;
           }
 
-          else if (comm == "Поставить") {
+          else if (comm == "Поставить") {                                              // поставить введенные Нки
             String range;
             getNIndex();                              //подумать, нужно ли оно тут
             if (!nka.subgroup) range += Sheet1;
@@ -579,7 +579,7 @@ class Menu {
             return;
           }
 
-          else if (comm.startsWith("В этот")) {
+          else if (comm.startsWith("В этот")) {                                        // нажал на плашку "В этот день пар нет" (любопытный тестировщик)
             bot.sendMessage("Чо жмешь? Сказали же, пар в выбранный день нет!", user);
             timer.add(bot.lastBotMsg(), 7, user);
             return;
@@ -591,7 +591,7 @@ class Menu {
           }
         }
 
-        else if (way == "0111") {                                                          //выбор месяца
+        else if (way == "0111") {                                                          // выбор месяца
           nka.month = t.month;
           nka.day = t.day;
           nka.year = t.year;
@@ -611,7 +611,7 @@ class Menu {
           }
         }
 
-        else if (way == "01111") {                                                         //выбор дня в месяце
+        else if (way == "01111") {                                                         // выбор дня в месяце
           for (int i = 1; i < day_month[nka.month-1]+1; i++) {
             if (comm == String(i)) {
               nka.day = i;
@@ -627,7 +627,7 @@ class Menu {
           }
         }
 
-        else if (way == "011111") {                                                       //выбор варианта Нки
+        else if (way == "011111") {                                                       // выбор варианта Нки
           if (comm != "Вернуться") {
             if (comm == "по УП") nka.nki[nka_ind] = '+';
             else if (comm == "по неУП") nka.nki[nka_ind] = '-';
@@ -647,7 +647,7 @@ class Menu {
         else  bot.sendMessage("err_menu", error_chat);
       }
 
-      if (way.startsWith("02")) {         //ветка подсчета
+      if (way.startsWith("02")) {                                  // ветка подсчета
         if (way == "02") {
           nka.surn = "";
           nka.nki = "";
@@ -884,7 +884,7 @@ class Menu {
     void calculate_page(byte calculate_depth) {
       String mess = "";
       switch (calculate_depth) {
-        case 0:
+        case 0:                                       // страница выбора фамилии
             mess = "";
             for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
               mess += students[i].surname;
@@ -894,7 +894,7 @@ class Menu {
             mess += "На главную";
         break;
 
-        case 1:
+        case 1:                                      // страница выбора варианта подсчета
           mess = "";
           mess += count.surn;
           mess += "\n";
@@ -902,7 +902,7 @@ class Menu {
           mess += "Назад\tНа главную";
         break;
 
-        case 2:
+        case 2:                                     // страница выбора предмета (если выбран варинат подсчета по предмету)
           mess = "Введите предмет:\n";
           for (byte i = 0; i < sizeof(subjects)/sizeof(subjects[0]); i++) {
               mess += subjects[i];
@@ -912,14 +912,14 @@ class Menu {
           mess += "Назад\tНа главную";
         break;
 
-        case 3:
+        case 3:                                     // страница, отображающая итог подсчета
           mess = "Итог подсчета:\n";
           mess += count.total;
           mess += "\nНа главную";
         break;
       }
 
-      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 //обновляем страницу у всех пользователей
         bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
       }
     }

@@ -249,7 +249,7 @@ uint16_t columnLetterToIndex(const String& col) {         //конвертаци
   return result - 1;
 }
 
-void sumDate(Date *date, int day_offset) {              //функция суммирования (как в плюс, так и в минус) стурктуры Date с неким числом дней. Изменяет напрямую переданный обьект
+void sumDate(Date *date, int day_offset) {              //функция суммирования (как в плюс, так и в минус) структуры Date с неким числом дней. Изменяет напрямую переданный обьект
   int total_day = date->day + day_offset;
 
   // Прибавление дней

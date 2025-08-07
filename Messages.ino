@@ -61,14 +61,14 @@ void newMsg(FB_msg& msg) {
   //-------------------------------------------Обработка ТОЛЬКО групп------------------------------------------
   for (int i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {                   
     if (msg.chatID == Groups[i]) {
-      if (msg.text == BOT_USERNAME) bot.replyMessage("Чо случилось? Список моих возможностей можно посмотреть с помощью /comms", bot.lastUsrMsg());
+      if (msg.text == BOT_USERNAME) bot.replyMessage("Чо случилось? Список моих возможностей можно посмотреть с помощью /comms", bot.lastUsrMsg(), msg.chatID);
     }
   }
 
 
 
   //----------------------------------------------Обработка всех чатов вместе-------------------------------------------
-  if (msg.text == "Кинуть кубик" || msg.text == "Бросить кубик")  bot.replyMessage(msg.username + ", выпало число: " + String(random(UINT_MAX)%6+1), bot.lastUsrMsg());      //добавить рандом для числа из пользовательнского диапазона
+  if (msg.text == "Кинуть кубик" || msg.text == "Бросить кубик")  bot.replyMessage(msg.username + ", выпало число: " + String(random(UINT_MAX)%6+1), bot.lastUsrMsg(), msg.chatID);      //добавить рандом для числа из пользовательнского диапазона
   else if (msg.text == "/comms")  {
     bot.sendTyping(msg.chatID);
     commandList(bot.lastUsrMsg());
@@ -76,5 +76,5 @@ void newMsg(FB_msg& msg) {
 
 
 
-  else if (msg.text.startsWith("/")) bot.replyMessage("А вот щас вообще не понял, что вы хотите от меня?", bot.lastUsrMsg());
+  else if (msg.text.startsWith("/")) bot.replyMessage("А вот щас вообще не понял, что вы хотите от меня?", bot.lastUsrMsg(), msg.chatID);
 }

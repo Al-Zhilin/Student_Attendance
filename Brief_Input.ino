@@ -166,6 +166,11 @@ void briefInput(Text message, String chat) {
     }
   }
 
+  if (!valid_lesson[0] || !valid_lesson[1]) {
+    bot.sendMessage("В данный день у " + String((!valid_lesson[0]) ? "1" : "") + String((!valid_lesson[0] && !valid_lesson[1]) ? " и " : "") + String((!valid_lesson[1]) ? "2" : "") + String((!valid_lesson[0] && !valid_lesson[1]) ? " подгрупп" : " подгруппы") + " нет пары под номером " + String(found_less) + "!\nВыставление пропусков соответствующим студентам невозможно!", chat);
+    timer.add(bot.lastBotMsg(), 20, chat);
+  }
+
   for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     Text dataa = message.getSub(i, "\n");
     byte surname_length[2] = {};                                                //количество фамилий этой подгруппы перед найденной. Нужно для вставки фамилии в документе на правильное место
@@ -228,13 +233,8 @@ void briefInput(Text message, String chat) {
   Heap -= ESP.getFreeHeap();
 
   for (byte i = 0; i < 2; i++) {
-    if (!need_post[i] || !valid_lesson[i])  {
+    if (!need_post[i])  {
       nki_array[i].clear();
-
-      if (!valid_lesson[i]) {
-        bot.sendMessage("В данный день у " + String((!i) ? "1" : "2") + " подгруппы нет пары под номером " + String(found_less) + "!\nВыставление пропусков студентам этой подгруппы невозможно!", chat);
-        timer.add(bot.lastBotMsg(), 20, chat);
-      }
       continue;
     }
 
