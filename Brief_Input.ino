@@ -136,8 +136,8 @@ void briefInput(Text message, String chat) {
   bool valid_lesson[2] = {false, false};                          //есть ли вообще в этот день у данной подгруппы эта пара? (да, мне показалось здесь самое время это проверить :) )
   byte lesson_length[2] = {};                                     //отображает, какая пара для выставления по счету в это день. (Счет всегда с 1, вот номер пары может быть 1)
   nka.surn = "";
-  nka.day = found_day;
-  nka.month = found_month;
+  nka.date.day = found_day;
+  nka.date.month = found_month;
   String range[2] = {Sheet1, Sheet2};
 
   for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе. В дальнейшем будем заменять некоторые позиции на фамилии. Гарантирует 'неразрывность' JSON документа

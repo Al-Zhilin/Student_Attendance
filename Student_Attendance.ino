@@ -72,8 +72,7 @@ String PROGMEM DaysOfWeek[] = {
 struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
   String nki;           //строка, в которой каждый символ это либо " " либо "Н", соответственно каждой паре выбранного дня
-  byte month;           //номер месяца
-  byte day;             //день в месяце
+  Date date;         //день и месяц выставления Нки
   byte dayWeek;         //день недели (1-7 / понедельник-воскресенье)
   String year;          //год 
   String posC;          //символьная составлющая координаты ячейки
@@ -485,8 +484,8 @@ class Menu {
         if (way == "01") {                                                            // отображается страница выбора фамилии
           nka.surn = "";
           nka.nki = "";
-          nka.month = t.month;
-          nka.day = t.day;
+          nka.date.month = t.month;
+          nka.date.day = t.day;
           nka.year = t.year;
           nka.dayWeek = t.dayWeek;
           nka.posC = 'A';
@@ -578,13 +577,13 @@ class Menu {
         }
 
         else if (way == "0111") {                                                          // выбор месяца
-          nka.month = t.month;
-          nka.day = t.day;
+          nka.date.month = t.month;
+          nka.date.day = t.day;
           nka.year = t.year;
           nka.dayWeek = t.dayWeek;
           for (int i = 0; i < 12; i++) {
             if (comm == months[i]) {
-              nka.month = i+1;
+              nka.date.month = i+1;
               way = "01111";
               edit_page(3);
               return;
@@ -598,9 +597,9 @@ class Menu {
         }
 
         else if (way == "01111") {                                                         // выбор дня в месяце
-          for (int i = 1; i < day_month[nka.month-1]+1; i++) {
+          for (int i = 1; i < day_month[nka.date.month-1]+1; i++) {
             if (comm == String(i)) {
-              nka.day = i;
+              nka.date.day = i;
               way = "011";
               edit_page(1);
               return;
@@ -637,8 +636,8 @@ class Menu {
         if (way == "02") {
           nka.surn = "";
           nka.nki = "";
-          nka.month = t.month;
-          nka.day = t.day;
+          nka.date.month = t.month;
+          nka.date.day = t.day;
           nka.year = t.year;
           nka.dayWeek = t.dayWeek;
           nka.posC = 'A';
@@ -725,11 +724,11 @@ class Menu {
           mess += nka.subgroup+1;
           mess += " подгруппа";
           mess +=  "\tДата: ";
-          if (nka.day < 10) mess += "0";
-          mess += nka.day;
+          if (nka.date.day < 10) mess += "0";
+          mess += nka.date.day;
           mess += ".";
-          if (nka.month < 10) mess += "0";
-          mess += nka.month;
+          if (nka.date.month < 10) mess += "0";
+          mess += nka.date.month;
           mess += ".";
           mess += nka.year[2];
           mess += nka.year[3];
@@ -822,29 +821,29 @@ class Menu {
 
           //этап 1 (сдвиг начала месяца)
           int k = 1;
-          if (nka.month == START_MONTH) k = START_DAY;
-          byte day_n = nka.day;                   
+          if (nka.date.month == START_MONTH) k = START_DAY;
+          byte day_n = nka.date.day;                   
           byte dayWeek_n = nka.dayWeek;
-          nka.day = k;
+          nka.date.day = k;
           getNIndex();
           byte pre_offset = nka.dayWeek-1;
           byte post_offset;
-          if (nka.month == t.month) nka.day = day_n;
-          else  nka.day = day_month[nka.month-1];
+          if (nka.date.month == t.month) nka.date.day = day_n;
+          else  nka.date.day = day_month[nka.date.month-1];
           getNIndex();
           post_offset = 7 - nka.dayWeek;
-          nka.day = day_n;
+          nka.date.day = day_n;
           nka.dayWeek = dayWeek_n;
 
           mess += "-пн-\t-вт-\t-ср-\t-чт-\t-пт-\t-сб-\t-вс-\n";
 
           for (byte i = 0; i < pre_offset; i++) mess += " \t";
 
-          for (byte i = k-1; i < day_month[nka.month-1]; i++) {
+          for (byte i = k-1; i < day_month[nka.date.month-1]; i++) {
             mess += i+1;
             if ((i+pre_offset-k) % 7 == 5)  mess += "\n";
             else mess += "\t";
-            if (nka.month == t.month && i+1 == t.day) break;
+            if (nka.date.month == t.month && i+1 == t.day) break;
           }
 
           for (byte i = 0; i < post_offset; i++)  {

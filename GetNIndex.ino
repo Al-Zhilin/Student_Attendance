@@ -2,37 +2,37 @@ void getNIndex() {
   byte weeks_ago = 0, days_ago = 0;
   int diff = 0;
   
-  if (week[nka.subgroup]->pon_month == nka.month) {
-    if (nka.day == week[nka.subgroup]->pon_day) {
+  if (week[nka.subgroup]->pon_month == nka.date.month) {
+    if (nka.date.day == week[nka.subgroup]->pon_day) {
       weeks_ago = 0;
       days_ago = 0;
     }
 
-    else if (nka.day > week[nka.subgroup]->pon_day) {
+    else if (nka.date.day > week[nka.subgroup]->pon_day) {
       weeks_ago = 0;
-      days_ago = nka.day - week[nka.subgroup]->pon_day;
+      days_ago = nka.date.day - week[nka.subgroup]->pon_day;
     }
 
-    else if (nka.day < week[nka.subgroup]->pon_day) {
-      diff = week[nka.subgroup]->pon_day - nka.day;
+    else if (nka.date.day < week[nka.subgroup]->pon_day) {
+      diff = week[nka.subgroup]->pon_day - nka.date.day;
       weeks_ago = (diff + 6) / 7;
       if (diff % 7 != 0) days_ago = 7 - (diff % 7);
     }
   }
 
-  else if (nka.month < week[nka.subgroup]->pon_month) {
+  else if (nka.date.month < week[nka.subgroup]->pon_month) {
     int d = 0;
-    for (byte i = nka.month+1; i < week[nka.subgroup]->pon_month; i++) {
+    for (byte i = nka.date.month+1; i < week[nka.subgroup]->pon_month; i++) {
       d += day_month[i - 1];
     }
-    diff = (week[nka.subgroup]->pon_day + day_month[nka.month-1]) - nka.day + d;
+    diff = (week[nka.subgroup]->pon_day + day_month[nka.date.month-1]) - nka.date.day + d;
     weeks_ago = (diff + 6) / 7;
     if (diff % 7 != 0) days_ago = 7 - (diff % 7);
   }
 
-  else if (nka.month > week[nka.subgroup]->pon_month) {
+  else if (nka.date.month > week[nka.subgroup]->pon_month) {
     weeks_ago = 0;
-    days_ago = (day_month[week[nka.subgroup]->pon_month-1] + nka.day) - week[nka.subgroup]->pon_day;
+    days_ago = (day_month[week[nka.subgroup]->pon_month-1] + nka.date.day) - week[nka.subgroup]->pon_day;
   }
 
   byte k = 0;
