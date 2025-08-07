@@ -100,7 +100,7 @@ struct CountInfo {
   int total;
   bool subgroup;
   String subject;
-  byte mode;      //0 -  все предметы УП, 1 - все предметы все Нки, 2 - по отдельным предметам
+  byte mode;      //0 -  все предметы УП, 1 - все предметы неУП, 2 - по отдельным предметам неУП
 } count;
 
 void checkYear() {
@@ -382,8 +382,8 @@ class Sheet {
         address += i;
         address += "]";
         if (nka.nki[i] == ' ')  data = "";
-        else if (nka.nki[i] == '+') data = "R";
-        else data = "D";
+        else if (nka.nki[i] == '+') data = RESPECT_SYMBOL;
+        else data = DISREP_SYMBOL;
         valueRange.set(address, data);
       }
       
@@ -396,29 +396,15 @@ class Sheet {
     }
 
     void Counting() {
-      if (!count.mode || count.mode == 1)  {         //все предметы УП (R) ИЛИ все предметы все Н
-        for (int i = 1; i < file_data.week_off+1; i++) {
-          String range = "";
-          if (!count.subgroup)  range += Sheet1;
-          else range += Sheet2;
-          range += charOffset(String(people_list_c), 1);
-          range += people_list_i + count.surn_ind + offset[count.subgroup]*(i-1);
-          range += ":";
-          byte plus = 0;
-
-          for (byte j = 0; j < 7; j++) {
-            plus += week[count.subgroup]->subj_num[j] + 1;
-          }
-
-          range += charOffset(String(people_list_c), 1+plus);
-          range += people_list_i + count.surn_ind + offset[count.subgroup]*(i-1);
-          Serial.println(range);
-        }
+      if (!count.mode || count.mode == 1)  {         //все предметы УП (R) ИЛИ все предметы неУП
+        
       }
 
-      if (count.mode == 2)   {        //по отдельным предметам
+      else if (count.mode == 2)   {        //по отдельным предметам
 
       }
+
+      else bot.sendMessage("Неизвестный count.mode", error_chat);
     }
 
     bool ready() {
@@ -765,8 +751,8 @@ class Menu {
               for (byte i = 0; i < (week[week_index]->subj_num[nka.dayWeek-1]); i++) {
                 String a = "";
                 answer.getSub(r_count + r_offset*i, "\"").toString(a);
-                if (a == "R")  nka.nki += "+";
-                else if (a == "D") nka.nki += "-";
+                if (a == RESPECT_SYMBOL)  nka.nki += "+";
+                else if (a == DISREP_SYMBOL) nka.nki += "-";
                 else nka.nki += " ";
               }
             }
