@@ -68,7 +68,6 @@ String PROGMEM DaysOfWeek[] = {
   "Воскресенье",
 };
 
-
 struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
   String nki;           //строка, в которой каждый символ это либо " " либо "Н", соответственно каждой паре выбранного дня
@@ -82,8 +81,7 @@ struct SetInfo {      //структура с данными, нужными д�
 } nka;
 
 struct WeekInfo {
-  byte pon_day = 0;               //число понедельника этой недели (week_info_c + 1; week_info_i) [0:1]
-  byte pon_month = 0;             //месяц понедельника этой недели  (week_info_c + 1; week_info_i) [3:4]
+  Date pon_date;                  //дата понедельника этой недели
   byte study_days = 0;            //количество учебных дней в неделе  (week_info_c; week_info_i) после /
   byte subj_num[7] = {};          //кол-во пар в учебных днях (less_mun_c; less_num_i)......
   byte *less_nums[7] = {};        //номера всех пар в дне
@@ -273,18 +271,18 @@ class Sheet {
         for (byte iter = 0; iter < ans.count("."); iter++)  {
           Text cell = ans.getSub(iter, ".");
           for (byte q = 0; q < cell.length(); q++) {
-            if (iter == 0)  week[i]->pon_day = (week[i]->pon_day * 10 + cell[q] - '0');
-            else if (iter == 1)  week[i]->pon_month = (week[i]->pon_month * 10 + cell[q] - '0');
+            if (iter == 0)  week[i]->pon_date.day = (week[i]->pon_date.day * 10 + cell[q] - '0');
+            else if (iter == 1)  week[i]->pon_date.month = (week[i]->pon_date.month * 10 + cell[q] - '0');
           }
         }
 
         if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
-          if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_day--;
-          else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_day-=2;
-          else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_day-=3;
-          else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_day-=4;
-          else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_day-=5;
-          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_day-=6;
+          if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_date.day--;
+          else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_date.day-=2;
+          else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_date.day-=3;
+          else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_date.day-=4;
+          else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_date.day-=5;
+          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_date.day-=6;
           else {
             bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\nОтвет от Sheet: \"" + answer.toString() + "\"", Admins[0]);
             ESP.restart();

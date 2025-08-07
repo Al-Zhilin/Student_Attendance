@@ -14,8 +14,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   Date dateToWeek;
-  dateToWeek.day = week[0]->pon_day;
-  dateToWeek.month = week[0]->pon_month;
+  dateToWeek.day = week[0]->pon_date.day;
+  dateToWeek.month = week[0]->pon_date.month;
   
   byte pulled_day = dateToWeek.day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
   byte pulled_month = dateToWeek.month;
@@ -75,8 +75,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
       }
     }
     
-    dateToWeek.day = week[i]->pon_day;
-    dateToWeek.month = week[i]->pon_month;
+    dateToWeek.day = week[i]->pon_date.day;
+    dateToWeek.month = week[i]->pon_date.month;
     sumDate(&dateToWeek, 6);
 
     for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
@@ -230,10 +230,10 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
   for (byte k = 0; k < 2; k++) {                //делаем pon_day и pon_month актуальными под последние недели. Какая то сложная схема, мб нужно переделать на что то попроще или вообще без цикла
     if (k) sumDate(&dateToWeek, -7);
-    week[0+2*k]->pon_day = dateToWeek.day;
-    week[1+2*k]->pon_day = dateToWeek.day;
-    week[0+2*k]->pon_month = dateToWeek.month;
-    week[1+2*k]->pon_month = dateToWeek.month;
+    week[0+2*k]->pon_date.day = dateToWeek.day;
+    week[1+2*k]->pon_date.day = dateToWeek.day;
+    week[0+2*k]->pon_date.month = dateToWeek.month;
+    week[1+2*k]->pon_date.month = dateToWeek.month;
   }
   
   return weeksToBuild;
