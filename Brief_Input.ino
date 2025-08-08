@@ -124,7 +124,7 @@ void briefInput(Text message, String chat) {
       }
     }
     if (!found_less) {
-      bot.editMessage(m_id, "Не удалось получить информацию о паре, которая идет прямо сейчас в сокращенном вводе без условия! Проверьте MINUTES_OFFSET в настройках программы, заданы ли временные рамки для данной пары в структуре или укажите условие вручную!");
+      bot.editMessage(m_id, "Не удалось получить информацию о паре, которая идет прямо сейчас в сокращенном вводе без условия! Проверьте MINUTES_OFFSET в настройках программы, заданы ли временные рамки для данной пары в структуре или укажите условие вручную!", chat);
       return;
     }
   }
@@ -199,7 +199,7 @@ void briefInput(Text message, String chat) {
 
       if (func_res == 2 && syntax_errors <= min_syntax_errors) {
         if (syntax_errors == min_syntax_errors) {
-          bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString(), error_chat);
+          bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString(), chat);
           timer.add(bot.lastBotMsg(), 10, error_chat);
           break;
         }
@@ -210,7 +210,7 @@ void briefInput(Text message, String chat) {
       }
 
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
-        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_people.surname + "\"", error_chat);
+        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_people.surname + "\"", chat);
         timer.add(bot.lastBotMsg(), 10, error_chat);
         //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
         if (valid_lesson[students[ind].subgroup]) {

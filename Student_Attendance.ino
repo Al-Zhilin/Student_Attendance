@@ -15,13 +15,13 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
-  byte week_off = 24;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
+  byte week_off = 2;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
 } file_data;
 
-FileData settings_file(&FFat, "/data.dat", 'A', &file_data, sizeof(file_data));
+FileData settings_file(&FFat, "/data.dat", 'B', &file_data, sizeof(file_data));
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -394,16 +394,15 @@ class Sheet {
 
     void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета
       if (!count.mode || count.mode == 1)  {                                  // все предметы УП (R) ИЛИ все предметы неУП
-        String symbolForSearch = (!count.mode) ? RESPECT_SYMBOL : DISREP_SYMBOL;                  // в зависимости от вида поиска ищем конкретный символ. Будем хранить его здесь для удобства
-        String formula = "=COUNTIF(FILTER(", diapason = "";
+        String formula = "=СЧЁТЕСЛИ(FILTER(", diapason = "";                                      // строка для сборки формулы вида =СЧЁТЕСЛИ(FILTER(C581:U617; ОСТАТ(СТРОКА(C581:C617)-588; 23)=0);"D")
         byte table_len[2] = {};                                                                       // горизонтальная длина таблицы
         bool prev = false;
 
-        for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {
+        for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {          // Высчитываем len
           for (int s = 0; s < 7; s++) {
-            if (week[count.subgroup + parity_iter]->subj_num[s] == 0) continue;
+            if (week[count.subgroup + 2*parity_iter]->subj_num[s] == 0) continue;
             if (prev) table_len[parity_iter] += 1;
-            table_len[parity_iter] += week[count.subgroup + parity_iter]->subj_num[s];
+            table_len[parity_iter] += week[count.subgroup + 2*parity_iter]->subj_num[s];
             prev = true;
           }
         }
@@ -412,12 +411,22 @@ class Sheet {
         diapason += less_name_c;                                        // символьное начало диапазона
         diapason += people_list_i + offset[count.subgroup] * (start_week-1);        // численное начало диапазона
         diapason += ":";
-        diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1]));
+        diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
         diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
         // === Собираем диапазон ===
 
-        bot.sendMessage(diapason, error_chat);
+        formula += diapason;
+        formula += "; ОСТАТ(СТРОКА(";
+        formula += diapason;
+        formula += ")-";
+        formula += people_list_i + offset[count.subgroup] * (start_week-1) + count.surn_ind;
+        formula += "; ";
+        formula += offset[count.subgroup];
+        formula += ")=0); \"";
+        formula += (!count.mode) ? RESPECT_SYMBOL : DISREP_SYMBOL;                                // в зависимости от вида поиска ищем конкретный символ
+        formula += "\")";
         
+        bot.sendMessage(formula, error_chat);
       }
 
       else if (count.mode == 2)   {        //по отдельным предметам
@@ -663,18 +672,17 @@ class Menu {
           nka.dayWeek = t.dayWeek;
           nka.posC = 'A';
           nka.posI = 0;
-          byte l = 0;
+          byte len[2] = {};
           for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
             if (comm == students[i].surname)  {
               count.surn = students[i].surname;
               count.subgroup = students[i].subgroup;
-              if (!students[i].subgroup) count.surn_ind = l;
-              else count.surn_ind = i-l+1;
+              count.surn_ind = len[count.subgroup];
               way = "021";
               calculate_page(1);
               return;
             }
-            if (!students[i].subgroup) l++;
+            len[students[i].subgroup]++;
           }
 
           if (ret_command)  {
