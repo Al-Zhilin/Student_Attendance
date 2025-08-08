@@ -55,7 +55,7 @@ byte day_month[] = {        //количество дней в каждом ме
 
 struct Date {
   byte day = 0;
-  byte month = 0; 
+  byte month = 0;
 };
 
 String PROGMEM DaysOfWeek[] = {
@@ -71,7 +71,7 @@ String PROGMEM DaysOfWeek[] = {
 struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
   String nki;           //строка, в которой каждый символ это либо " " либо "Н", соответственно каждой паре выбранного дня
-  Date date;         //день и месяц выставления Нки
+  Date date;            //день и месяц выставления Нки
   byte dayWeek;         //день недели (1-7 / понедельник-воскресенье)
   String year;          //год 
   String posC;          //символьная составлющая координаты ячейки
@@ -202,7 +202,7 @@ class Sheet {
   private:
 
   public:
-    void begin() {                                       //is_start обозначает, вызывается ли эта функция в начала работы программы или после очередной проверки актульность недели во время работы
+    void begin() {                                  // is_start обозначает, вызывается ли эта функция в начала работы программы или после очередной проверки актульность недели во время работы
       
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
       GSheet.setPrerefreshSeconds(10 * 60);
@@ -354,7 +354,7 @@ class Sheet {
     }
 
 
-    String getCells(String range) {
+    String getCells(String range) {                 // функция получения Нок из таблицы (чтобы в меню отображать)
       byte tries = 0;
       String answ;
       while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
@@ -366,7 +366,7 @@ class Sheet {
       return answ;
     }
 
-    void SetN(String range) {                       //базовая функция постановки Нок для одного человека в один день
+    void SetN(String range) {                       // базовая функция постановки Нок для одного человека в один день
       String answ = "";
       byte tries = 0;
 
@@ -392,8 +392,31 @@ class Sheet {
       valueRange.clear();
     }
 
-    void Counting() {
-      if (!count.mode || count.mode == 1)  {         //все предметы УП (R) ИЛИ все предметы неУП
+    void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета
+      if (!count.mode || count.mode == 1)  {                                  // все предметы УП (R) ИЛИ все предметы неУП
+        String symbolForSearch = (!count.mode) ? RESPECT_SYMBOL : DISREP_SYMBOL;                  // в зависимости от вида поиска ищем конкретный символ. Будем хранить его здесь для удобства
+        String formula = "=COUNTIF(FILTER(", diapason = "";
+        byte table_len[2] = {};                                                                       // горизонтальная длина таблицы
+        bool prev = false;
+
+        for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {
+          for (int s = 0; s < 7; s++) {
+            if (week[count.subgroup + parity_iter]->subj_num[s] == 0) continue;
+            if (prev) table_len[parity_iter] += 1;
+            table_len[parity_iter] += week[count.subgroup + parity_iter]->subj_num[s];
+            prev = true;
+          }
+        }
+
+        // === Собираем диапазон ===
+        diapason += less_name_c;                                        // символьное начало диапазона
+        diapason += people_list_i + offset[count.subgroup] * (start_week-1);        // численное начало диапазона
+        diapason += ":";
+        diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1]));
+        diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
+        // === Собираем диапазон ===
+
+        bot.sendMessage(diapason, error_chat);
         
       }
 
@@ -401,7 +424,7 @@ class Sheet {
 
       }
 
-      else bot.sendMessage("Неизвестный count.mode", error_chat);
+      else bot.sendMessage("Неизвестный count.mode!", error_chat);
     }
 
     bool ready() {
@@ -930,6 +953,8 @@ void setup() {
     case FD_FS_ERR: bot.sendMessage(F("FileSystemError!"), error_chat);
       break;
     case FD_FILE_ERR: bot.sendMessage(F("OpenFileError!"), error_chat);
+      break;
+    default:
       break;
   }
 
