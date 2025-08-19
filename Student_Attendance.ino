@@ -392,13 +392,13 @@ class Sheet {
       valueRange.clear();
     }
 
-    void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета
-      if (!count.mode || count.mode == 1)  {                                  // все предметы УП (R) ИЛИ все предметы неУП
-        String formula = "=СЧЁТЕСЛИ(FILTER(", diapason = "";                                      // строка для сборки формулы вида =СЧЁТЕСЛИ(FILTER(C581:U617; ОСТАТ(СТРОКА(C581:C617)-588; 23)=0);"D")
+    void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
+      if (!count.mode || count.mode == 1)  {                                  // все предметы УП ИЛИ все предметы неУП
+        String formula = "", diapason = "";                                      // строка для сборки формулы имеет конечный вид =СЧЁТЕСЛИ(FILTER(C581:U617; ОСТАТ(СТРОКА(C581:C617)-588; 23)=0);"D")
         byte table_len[2] = {};                                                                       // горизонтальная длина таблицы
         bool prev = false;
 
-        for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {          // Высчитываем len
+        for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {          // Высчитываем len (горизонталную длины недели в таблице)
           for (int s = 0; s < 7; s++) {
             if (week[count.subgroup + 2*parity_iter]->subj_num[s] == 0) continue;
             if (prev) table_len[parity_iter] += 1;
@@ -415,6 +415,9 @@ class Sheet {
         diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
         // === Собираем диапазон ===
 
+
+        // === Собираем саму формулу ===
+        formula += "=СЧЁТЕСЛИ(FILTER(";
         formula += diapason;
         formula += "; ОСТАТ(СТРОКА(";
         formula += diapason;
@@ -425,11 +428,49 @@ class Sheet {
         formula += ")=0); \"";
         formula += (!count.mode) ? RESPECT_SYMBOL : DISREP_SYMBOL;                                // в зависимости от вида поиска ищем конкретный символ
         formula += "\")";
+
         
-        bot.sendMessage(formula, error_chat);
+        // == Находим позицию вставки формулы в листе ===
+        String form_position = (!count.subgroup) ? Sheet1 : Sheet2;
+        form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + 4);
+        form_position += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
+
+        
+        // === Устанавливаем формулу в листе ===
+        FirebaseJson response, valueRange;
+        valueRange.add("range", form_position);
+        valueRange.add("majorDimension", "ROWS");
+        valueRange.set("values/[0]/[0]", formula);
+
+        byte tries = 0;
+        while (!GSheet.values.update(&response, spreadsheetId, form_position, &valueRange) && tries < SetTryNum) tries++;
+        if (tries == SetTryNum) bot.sendMessage("updateError");
+        valueRange.clear();
+
+        /*String responseStr;
+        response.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
+        bot.sendMessage(responseStr, error_chat);*/
+
+        response.clear();
+
+
+        // === Получаем итоговую цифру подсчета ===
+        tries = 0;
+        FirebaseJsonData result_object;
+        while (!GSheet.values.get(&response, spreadsheetId, form_position) && tries < GetTryNum) tries++;
+        if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
+
+        /*String responseStr;
+        response.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
+        bot.sendMessage(responseStr, error_chat);*/
+
+        response.get(result_object, "values/[0]/[0]");
+        response.clear();
+        count.total = result_object.intValue;
+        result_object.clear();
       }
 
-      else if (count.mode == 2)   {        //по отдельным предметам
+      else if (count.mode == 2)   {        //по отдельным предметам неУП
 
       }
 
@@ -644,8 +685,8 @@ class Menu {
 
         else if (way == "011111") {                                                       // выбор варианта Нки
           if (comm != "Вернуться") {
-            if (comm == "по УП") nka.nki[nka_ind] = '+';
-            else if (comm == "по неУП") nka.nki[nka_ind] = '-';
+            if (comm == "УП") nka.nki[nka_ind] = '+';
+            else if (comm == "неУП") nka.nki[nka_ind] = '-';
             else nka.nki[nka_ind] = ' ';
           }
           way = "011";
@@ -885,7 +926,7 @@ class Menu {
         break;
 
         case 4: {
-          mess = "Пропуск:\nпо УП\tпо неУП\tПрисутствие\nВернуться";
+          mess = "Пропуск:\nУП\tнеУП\tПрисутствие\nВернуться";
         }
         break;
       }
@@ -927,19 +968,29 @@ class Menu {
         break;
 
         case 3:                                     // страница, отображающая итог подсчета
-          mess = "Итог подсчета:\n";
+          mess += count.surn;
+          mess += "\t";
+          if (!count.mode)  mess += "УП\tВсего";
+          else if (count.mode == 1) mess += "неУП\tВсего";
+          else if (count.mode == 2) {
+            mess += "неУп\tпо \"";
+            if (count.subject != "") mess += count.subject;
+            else mess += "unknown lesson";
+            mess += "\"";
+          }
+          mess += "\n";
           mess += count.total;
           mess += "\nНа главную";
         break;
       }
 
-      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 //обновляем страницу у всех пользователей
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
         bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
       }
     }
 } menu;
 
-void editServiceMess(String edit_text) {              //функция редактирования "статусного" сообщения
+void editServiceMess(String edit_text) {              // функция редактирования "статусного" сообщения
   for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
     bot.editMessage(file_data.status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
   }
