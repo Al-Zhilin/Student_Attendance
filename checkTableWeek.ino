@@ -13,9 +13,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
   }
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
-  Date dateToWeek;
-  dateToWeek.day = week[0]->pon_date.day;
-  dateToWeek.month = week[0]->pon_date.month;
+  Date dateToWeek(week[0]->pon_date.day, week[0]->pon_date.month);
   
   byte pulled_day = dateToWeek.day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
   byte pulled_month = dateToWeek.month;

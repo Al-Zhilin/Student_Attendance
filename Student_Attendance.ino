@@ -56,6 +56,19 @@ byte day_month[] = {        //количество дней в каждом ме
 struct Date {
   byte day = 0;
   byte month = 0;
+
+  Date(byte dday, byte mmonth) : day(dday), month(mmonth) {
+    if (mmonth < 1 || mmonth > 12) {
+      bot.sendMessage(F("InvalidMonthSendInDate!"), error_chat);
+      month = 0;
+    }
+    if (dday < 1 || dday > day_month[mmonth]) {
+      bot.sendMessage(F("InvalidDaySendInDate!"), error_chat);
+      day = 0;
+    }    
+  }
+
+  Date() : day(0), month(0) {};
 };
 
 String PROGMEM DaysOfWeek[] = {
@@ -968,19 +981,46 @@ class Menu {
         break;
 
         case 3:                                     // страница, отображающая итог подсчета
-          mess += count.surn;
+          mess = count.surn;
           mess += "\t";
           if (!count.mode)  mess += "УП\tВсего";
           else if (count.mode == 1) mess += "неУП\tВсего";
           else if (count.mode == 2) {
             mess += "неУп\tпо \"";
-            if (count.subject != "") mess += count.subject;
+            if (count.subject != "") mess += count.subject;                             //хз, на всяяякийййй
             else mess += "unknown lesson";
             mess += "\"";
           }
           mess += "\n";
           mess += count.total;
           mess += "\nНа главную";
+        break;
+
+        case 4:                                                                       // страница, предлагающая выбор диапазона строк для подсчета
+          mess = "Нажатие меняет статус недели - начало/конец\n";
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          sumDate(&date_end, 6);
+          for (byte i = 0; i < file_data.week_off; i++) {
+            switch (i) {
+              case 0: mess += "Эта неделя";
+                break;
+              case 1: mess += "Предыдущая неделя";
+                break;
+              default:
+                sumDate(&date_start, -(7*i));
+                sumDate(&date_end, -(7*i));
+                mess += date_start.day;
+                mess += ".";
+                mess += date_start.month;
+                mess += " - ";
+                mess += date_end.day;
+                mess += ".";
+                mess += date_end.month;
+                break;
+            }
+            mess += "\n"
+            if (i == file_data.week_off-1)  mess += "На главную";
+          }
         break;
       }
 
