@@ -502,6 +502,7 @@ class Menu {
     byte nka_ind = 0;
     String s_menu[2] = {"Редактировать", "Подсчитать"};
     String way = "10000";
+    byte start_week_ind = 0, end_week_ind = 0;
 
   public:
     void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {              // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
@@ -750,26 +751,36 @@ class Menu {
           else if (comm == "Общее неУП") count.mode = 1;
           else if (comm == "По предметам (неУП)") {
             count.mode = 2;
-            way = "02111";
+            way = "0211";
             calculate_page(2);
             return;
           }
-          list.Counting();
-          way = "0211";
           calculate_page(3);
-          return;
+          way = "0212";
 
           if (ret_command)  {
             ret_command = false;
             calculate_page(1);
           }
+
+          return;
         }
 
-        if (way == "02111") {
+        if (way == "0212") {                     // нажата кнопка на меню выбора диапазона подсчета          
+          if (comm == "Далее") {
+            list.Counting();
+            calculate_page(4);
+          }
+
+          else {                                      // обрабатывааем нажатия на неделю
+
+          }
+        }
+
+        else if (way == "0211") {
           for (byte i = 0; i < sizeof(subjects)/sizeof(subjects[0]); i++) {
             if (comm == subjects[i]) {
               count.subject = comm;
-              list.Counting();
               calculate_page(3);
               way = "0211";
               return;
@@ -968,10 +979,12 @@ class Menu {
           mess += "\n";
           mess += "Общее УП\tОбщее неУП\tПо предметам (неУП)\n";
           mess += "Назад\tНа главную";
+          start_week_ind = 1;
+          end_week_ind = file_data.week_off;
         break;
 
         case 2:                                     // страница выбора предмета (если выбран варинат подсчета по предмету)
-          mess = "Введите предмет:\n";
+          mess = "Выберите предмет:\n";
           for (byte i = 0; i < sizeof(subjects)/sizeof(subjects[0]); i++) {
               mess += subjects[i];
               if (i % 3 == 2 || i == (sizeof(subjects)/sizeof(subjects[0]))-1) mess += "\n";
@@ -980,10 +993,68 @@ class Menu {
           mess += "Назад\tНа главную";
         break;
 
-        case 3:                                     // страница, отображающая итог подсчета
+        case 3: {                                                                      // страница, предлагающая выбор диапазона недель для подсчета
+          mess = "Нажмите для обозначения границ:\n";
+          mess += "Готово\tНазад\tНа главную";  
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          sumDate(&date_end, 6);
+
+          for (byte i = 0; i < file_data.week_off; i++) {
+            mess += file_data.week_off - i;
+            mess += ") ";
+
+            sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
+            sumDate(&date_end, -7);
+
+            if (start_week_ind == i+1)  {                 // вставляем символ начала...
+              mess += START_SYMBOL;
+              mess += " --- ";
+            }
+
+            else if (end_week_ind == i+1) {               // ...или конца диапазона, если данная неделя явялется его границей
+              mess += END_SYMBOL;
+              mess += " --- ";
+            }
+
+            if (!i) mess += "Эта неделя";
+
+            else if (i == 1) mess += "Предыдущая";
+
+            else {
+              mess += "c ";
+              if (date_start.day < 10) mess += "0";
+              mess += date_start.day;
+              mess += ".";
+              if (date_start.month < 10) mess += "0";
+              mess += date_start.month;
+              mess += " по ";
+              if (date_end.day < 10) mess += "0"; 
+              mess += date_end.day;
+              mess += ".";
+              if (date_end.month < 10) mess += "0";
+              mess += date_end.month;
+            }
+
+            if (start_week_ind == i+1)  {                 // и здесь вставляем символ начала...
+              mess += " --- ";
+              mess += START_SYMBOL;
+            }
+
+            else if (end_week_ind == i+1) {               // ...или конца диапазона, если данная неделя явялется его границей
+              mess += " --- ";
+              mess += END_SYMBOL;
+            }
+
+            if (i != file_data.week_off-1) mess += "\n";
+          }
+          break;
+        }
+
+        case 4:                                     // страница, отображающая итог подсчета
           mess = count.surn;
           mess += "\t";
           if (!count.mode)  mess += "УП\tВсего";
+
           else if (count.mode == 1) mess += "неУП\tВсего";
           else if (count.mode == 2) {
             mess += "неУп\tпо \"";
@@ -994,34 +1065,7 @@ class Menu {
           mess += "\n";
           mess += count.total;
           mess += "\nНа главную";
-        break;
-
-        case 4:                                                                       // страница, предлагающая выбор диапазона строк для подсчета
-          mess = "Нажатие меняет статус недели - начало/конец\n";
-          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
-          sumDate(&date_end, 6);
-          for (byte i = 0; i < file_data.week_off; i++) {
-            switch (i) {
-              case 0: mess += "Эта неделя";
-                break;
-              case 1: mess += "Предыдущая неделя";
-                break;
-              default:
-                sumDate(&date_start, -(7*i));
-                sumDate(&date_end, -(7*i));
-                mess += date_start.day;
-                mess += ".";
-                mess += date_start.month;
-                mess += " - ";
-                mess += date_end.day;
-                mess += ".";
-                mess += date_end.month;
-                break;
-            }
-            mess += "\n"
-            if (i == file_data.week_off-1)  mess += "На главную";
-          }
-        break;
+          break;
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
