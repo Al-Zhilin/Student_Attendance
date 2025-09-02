@@ -767,14 +767,16 @@ class Menu {
         }
 
         if (way == "0212") {                     // нажата кнопка на меню выбора диапазона подсчета          
-          if (comm == "Далее") {
-            list.Counting();
+          if (comm == "Готово") {
+            list.Counting(start_week_ind, end_week_ind);
             calculate_page(4);
           }
 
           else {                                      // обрабатывааем нажатия на неделю
-
+            
+            
           }
+
         }
 
         else if (way == "0211") {
@@ -962,6 +964,7 @@ class Menu {
 
     void calculate_page(byte calculate_depth) {
       String mess = "";
+      mess.reserve(1024);                             // должно чуточку ускорить работу со стрингами, уберегая от реаллокаций и иных плохостей
       switch (calculate_depth) {
         case 0:                                       // страница выбора фамилии
             mess = "";
@@ -995,26 +998,18 @@ class Menu {
 
         case 3: {                                                                      // страница, предлагающая выбор диапазона недель для подсчета
           mess = "Нажмите для обозначения границ:\n";
-          mess += "Готово\tНазад\tНа главную";  
+          mess += "Назад\tГотово\tНа главную\n";  
           Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
           sumDate(&date_end, 6);
 
           for (byte i = 0; i < file_data.week_off; i++) {
-            mess += file_data.week_off - i;
-            mess += ") ";
 
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
 
-            if (start_week_ind == i+1)  {                 // вставляем символ начала...
-              mess += START_SYMBOL;
-              mess += " --- ";
-            }
-
-            else if (end_week_ind == i+1) {               // ...или конца диапазона, если данная неделя явялется его границей
-              mess += END_SYMBOL;
-              mess += " --- ";
-            }
+            if (start_week_ind == i+1) mess += START_SYMBOL;
+            else mess += "-";
+            mess += "\t";
 
             if (!i) mess += "Эта неделя";
 
@@ -1035,15 +1030,9 @@ class Menu {
               mess += date_end.month;
             }
 
-            if (start_week_ind == i+1)  {                 // и здесь вставляем символ начала...
-              mess += " --- ";
-              mess += START_SYMBOL;
-            }
-
-            else if (end_week_ind == i+1) {               // ...или конца диапазона, если данная неделя явялется его границей
-              mess += " --- ";
-              mess += END_SYMBOL;
-            }
+            mess += "\t";
+            if (end_week_ind == i+1)  mess += END_SYMBOL;
+            else mess += "-";
 
             if (i != file_data.week_off-1) mess += "\n";
           }
