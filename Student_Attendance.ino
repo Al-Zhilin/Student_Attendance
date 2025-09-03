@@ -769,17 +769,27 @@ class Menu {
         if (way == "0212") {                     // нажата кнопка на меню выбора диапазона подсчета          
           if (comm == "Готово") {
             list.Counting(start_week_ind, end_week_ind);
-            calculate_page(4);
+            calculate_page(5);
+          }
+
+          else if (ret_command)  {
+            ret_command = false;
+            calculate_page(3);
           }
 
           else {                                      // обрабатывааем нажатия на неделю
-            
-            
+            calculate_page(4);                        // страница выбора статуса недели (Начало диапазона, конец или только эта неделя)
+            way = "02121";
           }
 
+          return;
         }
 
-        else if (way == "0211") {
+        else if (way == "02121") {                    // нажатия на странице выбора статуса недели (Начало диапазона, конец или только эта неделя)
+          
+        }
+
+        else if (way == "0211") {                     // выбор предмета для подсчета
           for (byte i = 0; i < sizeof(subjects)/sizeof(subjects[0]); i++) {
             if (comm == subjects[i]) {
               count.subject = comm;
@@ -1006,10 +1016,16 @@ class Menu {
 
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
+            
+            if (start_week_ind == i+1)  {
+              mess += START_SYMBOL;
+              mess += " --- ";
+            }
 
-            if (start_week_ind == i+1) mess += START_SYMBOL;
-            else mess += "-";
-            mess += "\t";
+            else if (end_week_ind == i+1) {
+              mess += END_SYMBOL;
+              mess += " --- ";
+            }
 
             if (!i) mess += "Эта неделя";
 
@@ -1030,16 +1046,26 @@ class Menu {
               mess += date_end.month;
             }
 
-            mess += "\t";
-            if (end_week_ind == i+1)  mess += END_SYMBOL;
-            else mess += "-";
+            if (start_week_ind == i+1)  {
+              mess += " --- ";
+              mess += START_SYMBOL;
+            }
+
+            else if (end_week_ind == i+1) {
+              mess += " --- ";
+              mess += END_SYMBOL;
+            }
 
             if (i != file_data.week_off-1) mess += "\n";
           }
           break;
         }
 
-        case 4:                                     // страница, отображающая итог подсчета
+        case 4;
+
+          break;
+
+        case 5:                                     // страница, отображающая итог подсчета
           mess = count.surn;
           mess += "\t";
           if (!count.mode)  mess += "УП\tВсего";
