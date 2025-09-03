@@ -502,7 +502,7 @@ class Menu {
     byte nka_ind = 0;
     String s_menu[2] = {"Редактировать", "Подсчитать"};
     String way = "10000";
-    byte start_week_ind = 0, end_week_ind = 0;
+    byte start_week_ind = 0, end_week_ind = 0, unknown_ind = 0;
 
   public:
     void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {              // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
@@ -778,6 +778,8 @@ class Menu {
           }
 
           else {                                      // обрабатывааем нажатия на неделю
+            // здесь надо суметь вычислить индекс в глобальном пространстве индексов недель [1; week_off] и засунуть его в unknown_ind
+            // здесь имеем comm = ~ "с 23.03 по 30.03"
             calculate_page(4);                        // страница выбора статуса недели (Начало диапазона, конец или только эта неделя)
             way = "02121";
           }
@@ -786,7 +788,12 @@ class Menu {
         }
 
         else if (way == "02121") {                    // нажатия на странице выбора статуса недели (Начало диапазона, конец или только эта неделя)
-          
+          if (comm == "Начало") start_week_ind = unknown_ind;
+          else if (comm == "Конец") end_week_ind = unknown_ind;
+          else if (comm == "Только эта неделя") {
+            start_week_ind = unknown_ind;
+            end_week_ind = unknown_ind;
+          }
         }
 
         else if (way == "0211") {                     // выбор предмета для подсчета
@@ -1061,8 +1068,8 @@ class Menu {
           break;
         }
 
-        case 4;
-
+        case 4:
+          mess = "Эта неделя ... диапазона:\nНачало\tКонец\tНачало и конец\nНа главную";
           break;
 
         case 5:                                     // страница, отображающая итог подсчета
