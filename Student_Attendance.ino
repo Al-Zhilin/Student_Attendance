@@ -54,21 +54,21 @@ byte day_month[] = {        //количество дней в каждом ме
 };
 
 struct Date {
-  byte day = 1;
-  byte month = 1;
+  byte day = 0;
+  byte month = 0;
 
   Date(byte dday, byte mmonth) : day(dday), month(mmonth) {
     if (mmonth < 1 || mmonth > 12) {
-      bot.sendMessage("InvalidMonthInDateConstructor! " + String(mmonth), error_chat);
-      month = 1;
+      bot.sendMessage(F("InvalidMonthInDateConstructor!"), error_chat);
+      month = 0;
     }
     if (dday < 1 || dday > day_month[mmonth]) {
       bot.sendMessage(F("InvalidDayInDateConstructor!"), error_chat);
-      day = 1;
+      day = 0;
     }    
   }
 
-  Date() : day(1), month(1) {};
+  Date() : day(0), month(0) {};
 };
 
 String PROGMEM DaysOfWeek[] = {
@@ -83,7 +83,7 @@ String PROGMEM DaysOfWeek[] = {
 
 struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
-  String nki;           //строка, в которой каждый символ это либо " " либо "Н", соответственно каждой паре выбранного дня
+  String nki;           //строка, в которой каждый индекс строки обозначает тип пропуска, соответственно каждой паре выбранного дня
   Date date;            //день и месяц выставления Нки
   byte dayWeek;         //день недели (1-7 / понедельник-воскресенье)
   String year;          //год 
