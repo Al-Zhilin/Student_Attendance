@@ -45,7 +45,11 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
     days_between += realTime.day;
     weeksToBuild = days_between / 7;
-    if (days_between % 7 != 0)  bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!"), error_chat);
+    if (days_between % 7 != 0)  {
+      bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);
+      //bot.sendMessage(String(week[0]->pon_date.day) + "." + String(week[0]->pon_date.month), error_chat);
+      return -1;
+    }
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
@@ -55,7 +59,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
 
   if (ESP.getFreeHeap()/1024 < 40)  {
-    bot.sendMessage(F("Возможна нехватка свободной памяти!\nДостроение новых недель прервано!"), error_chat);
+    bot.sendMessage(F("Возможна нехватка свободной памяти!\nКритично!"), error_chat);
+    return -1;                     // подумать!
   }
   
   for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп

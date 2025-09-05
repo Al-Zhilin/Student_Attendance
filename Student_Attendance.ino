@@ -54,21 +54,21 @@ byte day_month[] = {        //количество дней в каждом ме
 };
 
 struct Date {
-  byte day = 0;
-  byte month = 0;
+  byte day = 1;
+  byte month = 1;
 
   Date(byte dday, byte mmonth) : day(dday), month(mmonth) {
     if (mmonth < 1 || mmonth > 12) {
-      bot.sendMessage(F("InvalidMonthInDateConstructor!"), error_chat);
-      month = 0;
+      bot.sendMessage("InvalidMonthInDateConstructor! " + String(mmonth), error_chat);
+      month = 1;
     }
     if (dday < 1 || dday > day_month[mmonth]) {
       bot.sendMessage(F("InvalidDayInDateConstructor!"), error_chat);
-      day = 0;
+      day = 1;
     }    
   }
 
-  Date() : day(0), month(0) {};
+  Date() : day(1), month(1) {};
 };
 
 String PROGMEM DaysOfWeek[] = {
@@ -788,8 +788,11 @@ class Menu {
               return;
             }
 
-            Date startDate(1, 1), endDate(1, 1);
-            bot.sendMessage(String(comm[c_index+3]), error_chat);
+            Date startDate, endDate;
+            startDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0');
+            startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+
+            bot.sendMessage(String(startDate.day) + "." + String(startDate.month), error_chat);
 
             calculate_page(4);                        // страница выбора статуса недели (Начало диапазона, конец или только эта неделя)
             way = "02121";
