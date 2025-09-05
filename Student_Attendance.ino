@@ -781,18 +781,36 @@ class Menu {
             // здесь надо суметь вычислить индекс в глобальном пространстве индексов недель [1; week_off] и засунуть его в unknown_ind
             // здесь имеем comm = ~ "с 23.03 по 30.03"
 
-            int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
+            if (comm.indexOf("Эта неделя") != -1) unknown_ind = file_data.week_off;
+            else if (comm.indexOf("Предыдущая") != -1)  file_data.week_off-1;
 
-            if (c_index == -1)   {                                                // на прям крайняк
-              bot.sendMessage(F("invalidMenuTextInCount!"), error_chat);
-              return;
+            else {
+              int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
+
+              if (c_index == -1)   {                                                // на прям крайняк
+                bot.sendMessage(F("invalidMenuTextInCount!"), user);
+                return;
+              }
+
+              Date startDate;
+              startDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0');
+              startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+
+              bool found = false;
+              for (byte i = 0; i < file_data.week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
+                sumDate(&startDate, 7);
+
+                if (startDate.day == week[0]->pon_date.day && startDate.month == week[0]->pon_date.month)  {
+                  unknown_ind = file_data.week_off-i;
+                  found = true;
+                  break;
+                }
+              }
+
+              if (!found) {
+                bot.sendMessage(F("Не удалось найти индекс выбранной недели!"), user);
+              }
             }
-
-            Date startDate, endDate;
-            startDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0');
-            startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
-
-            bot.sendMessage(String(startDate.day) + "." + String(startDate.month), error_chat);
 
             calculate_page(4);                        // страница выбора статуса недели (Начало диапазона, конец или только эта неделя)
             way = "02121";
@@ -804,10 +822,14 @@ class Menu {
         else if (way == "02121") {                    // нажатия на странице выбора статуса недели (Начало диапазона, конец или только эта неделя)
           if (comm == "Начало") start_week_ind = unknown_ind;
           else if (comm == "Конец") end_week_ind = unknown_ind;
-          else if (comm == "Только эта неделя") {
+          else if (comm == "Начало и конец") {
             start_week_ind = unknown_ind;
             end_week_ind = unknown_ind;
           }
+
+          way = "0212";
+          calculate_page(3);
+          return;
         }
 
         else if (way == "0211") {                     // выбор предмета для подсчета
@@ -1038,13 +1060,10 @@ class Menu {
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
             
-            if (start_week_ind == i+1)  {
-              mess += START_SYMBOL;
-              mess += " --- ";
-            }
-
-            else if (end_week_ind == i+1) {
-              mess += END_SYMBOL;
+            if (start_week_ind == file_data.week_off-i || end_week_ind == file_data.week_off-i) {
+              if (start_week_ind == file_data.week_off-i && end_week_ind == file_data.week_off-i) mess += STARTEND_SYMBOL;
+              else if (start_week_ind == file_data.week_off-i) mess += START_SYMBOL;
+              else mess += END_SYMBOL;
               mess += " --- ";
             }
 
@@ -1067,14 +1086,11 @@ class Menu {
               mess += date_end.month;
             }
 
-            if (start_week_ind == i+1)  {
+            if (start_week_ind == file_data.week_off-i || end_week_ind == file_data.week_off-i) {
               mess += " --- ";
-              mess += START_SYMBOL;
-            }
-
-            else if (end_week_ind == i+1) {
-              mess += " --- ";
-              mess += END_SYMBOL;
+              if (start_week_ind == file_data.week_off-i && end_week_ind == file_data.week_off-i) mess += STARTEND_SYMBOL;
+              else if (start_week_ind == file_data.week_off-i) mess += START_SYMBOL;
+              else mess += END_SYMBOL;
             }
 
             if (i != file_data.week_off-1) mess += "\n";
@@ -1089,10 +1105,13 @@ class Menu {
         case 5:                                     // страница, отображающая итог подсчета
           mess = count.surn;
           mess += "\t";
-          if (!count.mode)  mess += "УП\tВсего";
+          if (!count.mode)  mess += "УП\t";
+          if (count.mode == 1) mess += "неУП\t";
 
-          else if (count.mode == 1) mess += "неУП\tВсего";
-          else if (count.mode == 2) {
+          if (start_week_ind == 1 && end_week_ind == file_data.week_off)  mess += "Всего";
+          else mess += "В диапазоне";
+
+          if (count.mode == 2) {
             mess += "неУп\tпо \"";
             if (count.subject != "") mess += count.subject;                             //хз, на всяяякийййй
             else mess += "unknown lesson";
