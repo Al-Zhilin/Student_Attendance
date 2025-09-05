@@ -15,7 +15,7 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
-  byte week_off = 2;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
+  byte week_off = 2;                                              // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
@@ -59,11 +59,11 @@ struct Date {
 
   Date(byte dday, byte mmonth) : day(dday), month(mmonth) {
     if (mmonth < 1 || mmonth > 12) {
-      bot.sendMessage(F("InvalidMonthSendInDate!"), error_chat);
+      bot.sendMessage(F("InvalidMonthInDateConstructor!"), error_chat);
       month = 0;
     }
     if (dday < 1 || dday > day_month[mmonth]) {
-      bot.sendMessage(F("InvalidDaySendInDate!"), error_chat);
+      bot.sendMessage(F("InvalidDayInDateConstructor!"), error_chat);
       day = 0;
     }    
   }
@@ -511,10 +511,10 @@ class Menu {
       if (!mode)  {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
           if (file_status == FD_WRITE || file_status == FD_ADD) {
-            bot.sendMessage("______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[i]);
+            bot.sendMessage("ИСиТенок v" + String(Version, 1), Admins[i]);
             file_data.status_mess[i] = bot.lastBotMsg();
           }
-          else bot.editMessage(file_data.status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________", Admins[0]);
+          else bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);
         }
         settings_file.update();
         return;
@@ -780,6 +780,17 @@ class Menu {
           else {                                      // обрабатывааем нажатия на неделю
             // здесь надо суметь вычислить индекс в глобальном пространстве индексов недель [1; week_off] и засунуть его в unknown_ind
             // здесь имеем comm = ~ "с 23.03 по 30.03"
+
+            int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
+
+            if (c_index == -1)   {                                                // на прям крайняк
+              bot.sendMessage(F("invalidMenuTextInCount!"), error_chat);
+              return;
+            }
+
+            Date startDate(1, 1), endDate(1, 1);
+            bot.sendMessage(String(comm[c_index+3]), error_chat);
+
             calculate_page(4);                        // страница выбора статуса недели (Начало диапазона, конец или только эта неделя)
             way = "02121";
           }
@@ -1039,7 +1050,7 @@ class Menu {
             else if (i == 1) mess += "Предыдущая";
 
             else {
-              mess += "c ";
+              mess += "с ";
               if (date_start.day < 10) mess += "0";
               mess += date_start.day;
               mess += ".";
@@ -1069,7 +1080,7 @@ class Menu {
         }
 
         case 4:
-          mess = "Эта неделя ... диапазона:\nНачало\tКонец\tНачало и конец\nНа главную";
+          mess = "Эта неделя ... диапазона:\nНачало\tКонец\tНачало и конец\nНа главную\tНазад";
           break;
 
         case 5:                                     // страница, отображающая итог подсчета
@@ -1098,7 +1109,7 @@ class Menu {
 
 void editServiceMess(String edit_text) {              // функция редактирования "статусного" сообщения
   for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-    bot.editMessage(file_data.status_mess[i], "______________ИСиТенок_v" + String(Version, 1) + "_____________" + "\n\n" + edit_text, Admins[i]);
+    bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + "\n\n" + edit_text, Admins[i]);
   }
 }
 
