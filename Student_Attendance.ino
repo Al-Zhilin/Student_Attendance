@@ -428,6 +428,7 @@ class Sheet {
         diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
         // === Собираем диапазон ===
 
+        bot.sendMessage(diapason, error_chat);
 
         // === Собираем саму формулу ===
         formula += "=СЧЁТЕСЛИ(FILTER(";
@@ -768,7 +769,7 @@ class Menu {
 
         if (way == "0212") {                     // нажата кнопка на меню выбора диапазона подсчета          
           if (comm == "Готово") {
-            list.Counting(start_week_ind, end_week_ind);
+            list.Counting(end_week_ind, start_week_ind);
             calculate_page(5);
           }
 
@@ -782,7 +783,7 @@ class Menu {
             // здесь имеем comm = ~ "с 23.03 по 30.03"
 
             if (comm.indexOf("Эта неделя") != -1) unknown_ind = file_data.week_off;
-            else if (comm.indexOf("Предыдущая") != -1)  file_data.week_off-1;
+            else if (comm.indexOf("Предыдущая") != -1)  unknown_ind = file_data.week_off-1;
 
             else {
               int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
@@ -1035,8 +1036,8 @@ class Menu {
           mess += "\n";
           mess += "Общее УП\tОбщее неУП\tПо предметам (неУП)\n";
           mess += "Назад\tНа главную";
-          start_week_ind = 1;
-          end_week_ind = file_data.week_off;
+          start_week_ind = file_data.week_off;
+          end_week_ind = 1;
         break;
 
         case 2:                                     // страница выбора предмета (если выбран варинат подсчета по предмету)
