@@ -428,8 +428,6 @@ class Sheet {
         diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
         // === Собираем диапазон ===
 
-        bot.sendMessage(diapason, error_chat);
-
         // === Собираем саму формулу ===
         formula += "=СЧЁТЕСЛИ(FILTER(";
         formula += diapason;
@@ -799,13 +797,13 @@ class Menu {
 
               bool found = false;
               for (byte i = 0; i < file_data.week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
-                sumDate(&startDate, 7);
-
                 if (startDate.day == week[0]->pon_date.day && startDate.month == week[0]->pon_date.month)  {
                   unknown_ind = file_data.week_off-i;
                   found = true;
                   break;
                 }
+
+                sumDate(&startDate, 7);
               }
 
               if (!found) {
@@ -1057,9 +1055,6 @@ class Menu {
           sumDate(&date_end, 6);
 
           for (byte i = 0; i < file_data.week_off; i++) {
-
-            sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
-            sumDate(&date_end, -7);
             
             if (start_week_ind == file_data.week_off-i || end_week_ind == file_data.week_off-i) {
               if (start_week_ind == file_data.week_off-i && end_week_ind == file_data.week_off-i) mess += STARTEND_SYMBOL;
@@ -1086,6 +1081,9 @@ class Menu {
               if (date_end.month < 10) mess += "0";
               mess += date_end.month;
             }
+
+            sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
+            sumDate(&date_end, -7);
 
             if (start_week_ind == file_data.week_off-i || end_week_ind == file_data.week_off-i) {
               mess += " --- ";
