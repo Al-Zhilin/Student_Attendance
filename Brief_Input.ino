@@ -1,6 +1,6 @@
 void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
-  byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0;
+  byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0;
   const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   int32_t m_id = 0;                        //Храним id сообщения, которое будет информировать пользователя о состоянии введенного им сокращенного ввода (принят/не принят, правильно введен/неправильно)
   String supp = "";
@@ -153,16 +153,23 @@ void briefInput(Text message, String chat) {
       lesson_length[i]++;
     }
 
-    range[i] += charOffset(String(nka.posC), lesson_length[i]);
+    range[i] += charOffset(String(nka.posC), lesson_length[i]);                   // собираем полный вид диапазона для чтения/записи
     range[i] += nka.posI;
+    range[i] += ":";
+    range[i] += charOffset(String(nka.posC), lesson_length[i]);
+    range[i] += nka.posI + people_in_subgr[i] - 1;
 
-    nki_array[i].add("range", range[i]);
-    nki_array[i].add("majorDimension", "COLUMNS");
+    tries = 0;
+    while (!GSheet.values.get(&nki_array[i], spreadsheetId, range[i]) && tries < GetTryNum) tries++;
+    if (tries == SetTryNum) bot.sendMessage("ErrorGetRequest!", chat);
+
     for (byte j = 0; j < people_in_subgr[i]; j++) {
-      String address = "values/[0]/[";
+      String address = "values/[";
       address += j;
-      address += "]";
-      nki_array[i].set(address, "");
+      address += "]/[0]";
+      if (getJsonData(nki_array[i], address, false) == "invalidPath") {
+        nki_array[i].set(address, "");
+      }
     }
   }
 
@@ -179,7 +186,7 @@ void briefInput(Text message, String chat) {
     byte min_syntax_errors = 250;
     person assumed_people;                                                      //если фамилия с опечаткой - здесь будем хранить человека, наиболее подходящего
     byte assumed_length = 0;
-    String address = "values/[0]/[";
+    String address = "values/[";
 
     for (int ind = 0; ind < sizeof(students)/sizeof(students[0]); ind++) {      //цикл перебирает все фамилии по списку и сравнивает с введенной
       syntax_errors = 0;
@@ -189,9 +196,11 @@ void briefInput(Text message, String chat) {
         //------------------Здесь ставим Нку нужному человеку-----------------------------
         if (valid_lesson[students[ind].subgroup]) {
           address += surname_length[students[ind].subgroup];
-          address += "]";
-          nki_array[students[ind].subgroup].set(address, "D");
-          need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          address += "]/[0]";
+          if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
+            nki_array[students[ind].subgroup].set(address, "D"); 
+            need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          }
         }
         surname_found = true;
         break;
@@ -215,9 +224,11 @@ void briefInput(Text message, String chat) {
         //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
         if (valid_lesson[students[ind].subgroup]) {
           address += assumed_length;
-          address += "]";
-          nki_array[assumed_people.subgroup].set(address, "D");
-          need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          address += "]/[0]";
+          if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
+            nki_array[assumed_people.subgroup].set(address, "D");
+            need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          }
         }
         surname_found = true;
       }
@@ -238,16 +249,23 @@ void briefInput(Text message, String chat) {
       continue;
     }
 
-    byte tries = 0;
     String answ = "";
-
+    tries = 0;
     while (!GSheet.values.update(&answ, spreadsheetId, range[i], &nki_array[i]) && tries < SetTryNum) {
       tries++;
     }
-  
+
     nki_array[i].clear();
     if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
   }
 
   bot.editMessage(m_id, "Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.", chat);
+}
+
+String getJsonData (FirebaseJson &object, String &addr, bool show_error) {
+  FirebaseJsonData data;
+  if (object.get(data, addr)) return data.stringValue;
+  if (show_error) bot.sendMessage("invalidPath", error_chat);
+  return "invalidPath";
+    
 }
