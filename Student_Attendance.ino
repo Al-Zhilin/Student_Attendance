@@ -15,13 +15,13 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
-  byte week_off = 2;                                              // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
+  byte week_off = 2;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
 } file_data;
 
-FileData settings_file(&FFat, "/data.dat", 'B', &file_data, sizeof(file_data));
+FileData settings_file(&FFat, "/data.dat", 'V', &file_data, sizeof(file_data));
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -289,7 +289,7 @@ class Sheet {
           }
         }
 
-        if (firstDayName != "понедельник" || firstDayName == "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
+        if (firstDayName != "понедельник" && firstDayName != "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
           if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_date.day--;
           else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_date.day-=2;
           else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_date.day-=3;
@@ -298,7 +298,6 @@ class Sheet {
           else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_date.day-=6;
           else {
             bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\nОтвет от Sheet: \"" + answer.toString() + "\"", Admins[0]);
-            ESP.restart();
           }
         }
         //----------------------Дата понедельника этой недели---------------------------
