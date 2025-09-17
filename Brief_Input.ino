@@ -2,7 +2,6 @@ void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0;
   const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
-  int32_t m_id = 0;                        //Храним id сообщения, которое будет информировать пользователя о состоянии введенного им сокращенного ввода (принят/не принят, правильно введен/неправильно)
   String supp = "";
   FB_Time real_time = bot.getTime(3);
 
@@ -25,10 +24,9 @@ void briefInput(Text message, String chat) {
 
   if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
-  bot.sendMessage("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...", chat);
+  editServiceMess("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...");
   timer.add(bot.lastBotMsg(), 15, chat);
   timer.add(bot.lastUsrMsg(), 15, chat);
-  m_id = bot.lastBotMsg();
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
     String condition = message.getSub(0, "\n").toString();
@@ -60,7 +58,7 @@ void briefInput(Text message, String chat) {
         else if (isDigit(symbol[0])) {
           found_day = found_day*10 + (symbol[0] - '0');
           if (found_day > day_month[found_month])  {
-            bot.editMessage(m_id, "Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!", chat);
+            editServiceMess("Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!");
             return;
           }
         }
@@ -70,7 +68,7 @@ void briefInput(Text message, String chat) {
         if (isDigit(symbol[0])) {
           found_month = found_month*10 + (symbol[0] - '0');
           if (found_month > 12)  {
-            bot.editMessage(m_id, "Значение месяца в сокращенном вводе некорректно: \"" + String(found_month) + "\"!", chat);
+            editServiceMess("Значение месяца в сокращенном вводе некорректно: \"" + String(found_month) + "\"!");
             return;
           }
         }
@@ -103,7 +101,7 @@ void briefInput(Text message, String chat) {
     }
 
     else if (faza == 1) {
-      bot.editMessage(m_id, "Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!", chat);
+      editServiceMess("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!");
       return;
     }
 
@@ -124,7 +122,7 @@ void briefInput(Text message, String chat) {
       }
     }
     if (!found_less) {
-      bot.editMessage(m_id, "Убедитесь в корректности текущей пары!", chat);
+      editServiceMess("Убедитесь в корректности текущей пары!");
       return;
     }
   }
@@ -259,7 +257,7 @@ void briefInput(Text message, String chat) {
     if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
   }
 
-  bot.editMessage(m_id, "Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.", chat);
+  editServiceMess("Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.");
 }
 
 String getJsonData (FirebaseJson &object, String &addr, bool show_error) {
