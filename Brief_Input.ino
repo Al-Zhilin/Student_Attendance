@@ -24,7 +24,7 @@ void briefInput(Text message, String chat) {
 
   if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
-  editServiceMess("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...");
+  serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...");
   timer.add(bot.lastBotMsg(), 15, chat);
   timer.add(bot.lastUsrMsg(), 15, chat);
 
@@ -58,7 +58,7 @@ void briefInput(Text message, String chat) {
         else if (isDigit(symbol[0])) {
           found_day = found_day*10 + (symbol[0] - '0');
           if (found_day > day_month[found_month])  {
-            editServiceMess("Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!");
+            serviceMess.edit("Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!");
             return;
           }
         }
@@ -68,7 +68,7 @@ void briefInput(Text message, String chat) {
         if (isDigit(symbol[0])) {
           found_month = found_month*10 + (symbol[0] - '0');
           if (found_month > 12)  {
-            editServiceMess("Значение месяца в сокращенном вводе некорректно: \"" + String(found_month) + "\"!");
+            serviceMess.edit("Значение месяца в сокращенном вводе некорректно: \"" + String(found_month) + "\"!");
             return;
           }
         }
@@ -101,7 +101,7 @@ void briefInput(Text message, String chat) {
     }
 
     else if (faza == 1) {
-      editServiceMess("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!");
+      serviceMess.edit("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!");
       return;
     }
 
@@ -122,7 +122,7 @@ void briefInput(Text message, String chat) {
       }
     }
     if (!found_less) {
-      editServiceMess("Убедитесь в корректности текущей пары!");
+      serviceMess.edit("Убедитесь в корректности текущей пары!");
       return;
     }
   }
@@ -257,7 +257,7 @@ void briefInput(Text message, String chat) {
     if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
   }
 
-  editServiceMess("Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.");
+  serviceMess.edit("Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.", 5000);
 }
 
 String getJsonData (FirebaseJson &object, String &addr, bool show_error) {

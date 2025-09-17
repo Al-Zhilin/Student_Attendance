@@ -2,7 +2,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
   FB_Time realTime = bot.getTime(3);                            //структура реального времени
   uint32_t Heap;
 
-  editServiceMess("Проверяю актуальность недели в таблице...");
+  serviceMess.edit("Проверяю актуальность недели в таблице...");
 
   //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
@@ -27,7 +27,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
   if (pulled_month == realTime.month) {       //если месяцы одинаковые
     if (realTime.day == pulled_day) {
-      editServiceMess("В таблице записана актуальная неделя!");
+      serviceMess.edit("В таблице записана актуальная неделя!", 5000);
       return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!
     }
 
@@ -52,7 +52,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
   }
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
-  editServiceMess("Нужно достроить недель: " + String(weeksToBuild));
+  serviceMess.edit("Нужно достроить недель: " + String(weeksToBuild));
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
   byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
@@ -86,7 +86,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
       FirebaseJsonArray requests;     //массив запросов
       FirebaseJson request;         //храним по очереди все запросы перед добавлением в массив запросовE
 
-      editServiceMess("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2");
+      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2");
       Heap = ESP.getFreeHeap();     //засекаем количество свободной памяти до сборки JSON`ов
 
 
@@ -199,7 +199,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
       //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
 
 
-      editServiceMess("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String((Heap - ESP.getFreeHeap())/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
+      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String((Heap - ESP.getFreeHeap())/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
@@ -216,7 +216,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
   }
   
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  editServiceMess("Достроено " + String(weeksToBuild) + " недель!");
+  serviceMess.edit("Достроено " + String(weeksToBuild) + " недель!", 5000);
   file_data.week_off += weeksToBuild;
   settings_file.update();
 

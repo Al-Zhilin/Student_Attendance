@@ -211,6 +211,33 @@ class DeleteTimer {
   }
 } timer;
 
+class ServiceMess {
+  private:
+    uint32_t period = 0;
+    uint32_t start_millis = 0;
+
+  public:
+    void edit(String edit_text, uint32_t clear_period = 0) {              // функция редактирования "статусного" сообщения
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+        bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + "\n\n" + edit_text, Admins[i]);
+      }
+
+      if (clear_period) {
+        period = clear_period;
+        start_millis = millis();
+      }
+    }
+
+    void tick() {
+      if (!period)  return;
+      if (millis() - start_millis >= period) {
+        this->edit("");
+        period = 0;
+      }
+    }
+
+} serviceMess;
+
 class Sheet {
   private:
 
@@ -221,7 +248,7 @@ class Sheet {
       GSheet.setPrerefreshSeconds(10 * 60);
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
 
-      editServiceMess("Подключаюсь к Google Sheet API...");
+      serviceMess.edit("Подключаюсь к Google Sheet API...");
 
       uint32_t reset_timer = millis();
       //digitalWrite(2, true);
@@ -233,7 +260,7 @@ class Sheet {
       }
       //digitalWrite(2, false);
 
-      editServiceMess("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
+      serviceMess.edit("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
 
       for (byte i = 0; i < 4; i++) {
         String get_cell = "", range = "", returned_string;
@@ -527,8 +554,6 @@ class Menu {
       }
       settings_file.update();
     }
-
-    friend void editServiceMess(String edit_text);              //функция редактирования "статусного" сообщения
 
     void menuEdit (String comm, String user) {
       FB_Time t = bot.getTime(3);
@@ -1127,12 +1152,6 @@ class Menu {
     }
 } menu;
 
-void editServiceMess(String edit_text) {              // функция редактирования "статусного" сообщения
-  for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-    bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + "\n\n" + edit_text, Admins[i]);
-  }
-}
-
 void setup() {
   Serial.begin(115200);                                                         // последовательный порт аааткрывать
   WiFi_Connect();                                                               // подключаемся к WiFi
@@ -1165,16 +1184,18 @@ void setup() {
   list.begin();
   menu.start_page(1, file_stat);       //вот тут уже отсылаем менюшку
   checkYear();              //проверяем год на високосность
-  editServiceMess("");            //стираем все приколюхи в статусном сообщении после всех begin`ов
 }
 
 void loop() {
   static int old_year = 0;
   static byte old_day = 0;
+
   bot.tick();
   settings_file.tick();
   timer.tick();
+  serviceMess.tick();
   ArduinoOTA.handle();
+
   FB_Time t = bot.getTime(3);
 
   if (!old_year && t.year)  old_year = t.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
