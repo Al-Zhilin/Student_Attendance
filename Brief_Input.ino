@@ -3,15 +3,20 @@ void briefInput(Text message, String chat) {
   byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0;
   const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "";
+  byte presence_mode = 0;
   FB_Time real_time = bot.getTime(3);
 
-  for (int i = 0; i <= message.count("\n"); i++) {                  //цикл, каждый раз берем часть сообщения до перевода строки
-    Text dataa = message.getSub(i, "\n");                       //тут как раз и берем
+  if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors)) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
+    presence_mode = 1;
+  }
+
+  for (int i = presence_mode; i <= message.count("\n"); i++) {                  //цикл, каждый раз берем часть сообщения до перевода строки
+    Text dataa = message.getSub(i, "\n");                                       //тут как раз и берем
 
     for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                //выискиваем среди всех фамилий нашу
       syntax_errors = 0;
       if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {
-        if (i == 0) input_found = 1;                      //если первая строка - фамилия = это сокращенный ввод без условия
+        if (i == presence_mode) input_found = 1;          //если первая строка - фамилия = это сокращенный ввод без условия
         else  input_found = 2;                            //иначе - это сокращенный ввод с условием
         break;
       }
@@ -20,16 +25,15 @@ void briefInput(Text message, String chat) {
     if (input_found)  break;
   }
 
-  if (input_found == 2 && !isDigit((message.getSub(0, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
+  if (input_found == 2 && !isDigit((message.getSub(presence_mode, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
 
   if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
   serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...");
-  timer.add(bot.lastBotMsg(), 15, chat);
   timer.add(bot.lastUsrMsg(), 15, chat);
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
-    String condition = message.getSub(0, "\n").toString();
+    String condition = message.getSub(presence_mode, "\n").toString();
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
@@ -122,7 +126,7 @@ void briefInput(Text message, String chat) {
       }
     }
     if (!found_less) {
-      serviceMess.edit("Убедитесь в корректности текущей пары!");
+      serviceMess.edit("Убедитесь в корректности текущей пары!", 5000);
       return;
     }
   }
@@ -166,7 +170,8 @@ void briefInput(Text message, String chat) {
       address += j;
       address += "]/[0]";
       if (getJsonData(nki_array[i], address, false) == "invalidPath") {
-        nki_array[i].set(address, "");
+        if (!presence_mode) nki_array[i].set(address, "");
+        else nki_array[i].set(address, "D");
       }
     }
   }
@@ -176,7 +181,7 @@ void briefInput(Text message, String chat) {
     timer.add(bot.lastBotMsg(), 20, chat);
   }
 
-  for (int i = input_found-1; i < message.count("\n"); i++) {                   //обрабатываем фамилии
+  for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     Text dataa = message.getSub(i, "\n");
     byte surname_length[2] = {};                                                //количество фамилий этой подгруппы перед найденной. Нужно для вставки фамилии в документе на правильное место
 
@@ -195,9 +200,15 @@ void briefInput(Text message, String chat) {
         if (valid_lesson[students[ind].subgroup]) {
           address += surname_length[students[ind].subgroup];
           address += "]/[0]";
-          if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
-            nki_array[students[ind].subgroup].set(address, "D"); 
+
+          if (presence_mode) {
+            nki_array[students[ind].subgroup].set(address, " "); 
             need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          }
+
+          else if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
+            nki_array[students[ind].subgroup].set(address, "D"); 
+            need_post[students[ind].subgroup] = true;
           }
         }
         surname_found = true;
@@ -223,7 +234,13 @@ void briefInput(Text message, String chat) {
         if (valid_lesson[students[ind].subgroup]) {
           address += assumed_length;
           address += "]/[0]";
-          if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
+
+          if (presence_mode) {
+            nki_array[students[ind].subgroup].set(address, " "); 
+            need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          }
+
+          else if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
             nki_array[assumed_people.subgroup].set(address, "D");
             need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
           }
@@ -242,13 +259,14 @@ void briefInput(Text message, String chat) {
   Heap -= ESP.getFreeHeap();
 
   for (byte i = 0; i < 2; i++) {
-    if (!need_post[i])  {
+    if (!need_post[i] && !presence_mode)  {
       nki_array[i].clear();
       continue;
     }
 
     String answ = "";
     tries = 0;
+
     while (!GSheet.values.update(&answ, spreadsheetId, range[i], &nki_array[i]) && tries < SetTryNum) {
       tries++;
     }
@@ -265,5 +283,5 @@ String getJsonData (FirebaseJson &object, String &addr, bool show_error) {
   if (object.get(data, addr)) return data.stringValue;
   if (show_error) bot.sendMessage("invalidPath", error_chat);
   return "invalidPath";
-    
+
 }

@@ -15,13 +15,13 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
-  byte week_off = 2;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
+  byte week_off = 3;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
-} file_data;
+} file_data;    // ПРИ СМЕНЕ ДАННЫХ РЕДАКТИРУЙ WEEK_OFF ДЛЯ ИЗБЕЖАНИЯ ПЕРЕЗАПИСЫВАНИЯ НЕДЕЛЬ!!!!!!!!
 
-FileData settings_file(&FFat, "/data.dat", 'V', &file_data, sizeof(file_data));
+FileData settings_file(&FFat, "/data.dat", 'Z', &file_data, sizeof(file_data));
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -213,30 +213,34 @@ class DeleteTimer {
 
 class ServiceMess {
   private:
-    uint32_t period = 0;
+    bool need_clear = false;
+    uint32_t delete_period = 0;
     uint32_t start_millis = 0;
 
   public:
-    void edit(String edit_text, uint32_t clear_period = 0) {              // функция редактирования "статусного" сообщения
+    void edit(String edit_text, uint32_t del_period = 0) {                  // перегруженная функция, запускает таймер на очистку сообщения. Можно было сделать и без перегрузки, но нэт :)
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + "\n\n" + edit_text, Admins[i]);
+        bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + ((edit_text != "") ? "\n\n" : "") + edit_text, Admins[i]);
       }
 
-      if (clear_period) {
-        period = clear_period;
+      if (del_period) {
+        need_clear = true;
+        delete_period = del_period;
         start_millis = millis();
       }
     }
 
     void tick() {
-      if (!period)  return;
-      if (millis() - start_millis >= period) {
+      if (!need_clear) return;
+
+      if (millis() - start_millis >= delete_period) {
         this->edit("");
-        period = 0;
+        need_clear = false;
       }
     }
 
 } serviceMess;
+
 
 class Sheet {
   private:
@@ -533,6 +537,7 @@ class Menu {
     void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {              // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
       if (way == "10000") way = "0";
 
+      bot.notify(false);
       if (!mode)  {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
           if (file_status == FD_WRITE || file_status == FD_ADD) {
@@ -552,6 +557,8 @@ class Menu {
         }
         else  bot.editMenu(file_data.menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
       }
+
+      bot.notify(false);
       settings_file.update();
     }
 
