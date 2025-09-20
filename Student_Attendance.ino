@@ -421,7 +421,7 @@ class Sheet {
         String address = "values/[0]/[", data = "";
         address += i;
         address += "]";
-        if (nka.nki[i] == ' ')  data = "";
+        if (nka.nki[i] == ' ')  data = PRESENCE_SYMBOL;
         else if (nka.nki[i] == '+') data = RESPECT_SYMBOL;
         else data = DISREP_SYMBOL;
         valueRange.set(address, data);
@@ -941,7 +941,7 @@ class Menu {
               mess += ") ";
               if (nka.nki[i] == '-')  mess += Disrep;
               else if (nka.nki[i] == '+') mess += Respect;
-              else mess += " ";
+              else mess += Presence_menu;
               if (i != week[week_index]->subj_num[nka.dayWeek-1]-1) mess += "\t";
               else mess += "\n";
             }

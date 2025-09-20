@@ -1,19 +1,22 @@
 void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0;
-  const String ignored_symbols = ",. ";    //символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
-  String supp = "";
-  byte presence_mode = 0;
+  const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
+  String supp = "", post_symbol = "", temp_dataa = "";
+  byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не наоборот
   FB_Time real_time = bot.getTime(3);
+
+  post_symbol.reserve(10);
 
   if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors)) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
     presence_mode = 1;
   }
 
-  for (int i = presence_mode; i <= message.count("\n"); i++) {                  //цикл, каждый раз берем часть сообщения до перевода строки
-    Text dataa = message.getSub(i, "\n");                                       //тут как раз и берем
+  for (int i = presence_mode; i <= message.count("\n"); i++) {                  // цикл, каждый раз берем часть сообщения до перевода строки
+    SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
+    Text dataa(temp_dataa);
 
-    for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                //выискиваем среди всех фамилий нашу
+    for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                // выискиваем среди всех фамилий нашу
       syntax_errors = 0;
       if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {
         if (i == presence_mode) input_found = 1;          //если первая строка - фамилия = это сокращенный ввод без условия
@@ -182,7 +185,8 @@ void briefInput(Text message, String chat) {
   }
 
   for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) {                   //обрабатываем фамилии
-    Text dataa = message.getSub(i, "\n");
+    SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
+    Text dataa(temp_dataa);
     byte surname_length[2] = {};                                                //количество фамилий этой подгруппы перед найденной. Нужно для вставки фамилии в документе на правильное место
 
     bool surname_found = false;
@@ -206,9 +210,28 @@ void briefInput(Text message, String chat) {
             need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
           }
 
-          else if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
-            nki_array[students[ind].subgroup].set(address, "D"); 
-            need_post[students[ind].subgroup] = true;
+          else {
+            if (post_symbol == "" && getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {          // если доп указания отсутствуют
+              nki_array[students[ind].subgroup].set(address, DISREP_SYMBOL); 
+              need_post[students[ind].subgroup] = true;
+            }
+
+            else if (post_symbol == "уп" || post_symbol == "Уп" || post_symbol == "УП") {                             // если нужно отметить пропуск как УП
+              nki_array[students[ind].subgroup].set(address, RESPECT_SYMBOL);
+              need_post[students[ind].subgroup] = true;
+            }
+
+            else if (post_symbol == "неуп" || post_symbol == "неУП" || post_symbol == "неУп") {                       // если понадобилось отметить пропуск как неУП (например, когда ранее он был отмечен УП)
+              nki_array[students[ind].subgroup].set(address, DISREP_SYMBOL);
+              need_post[students[ind].subgroup] = true;
+            }
+
+            else if (post_symbol == "тут" || post_symbol == "Тут") {                                                  // когда нужно отметить присутствие человека
+              nki_array[students[ind].subgroup].set(address, PRESENCE_SYMBOL);
+              need_post[students[ind].subgroup] = true;
+            }
+
+            else bot.sendMessage("Неизвестное дополнительное указание к фамилии \"" + students[ind].surname + "\": \"" + post_symbol + "\"!", chat);
           }
         }
         surname_found = true;
@@ -283,5 +306,18 @@ String getJsonData (FirebaseJson &object, String &addr, bool show_error) {
   if (object.get(data, addr)) return data.stringValue;
   if (show_error) bot.sendMessage("invalidPath", error_chat);
   return "invalidPath";
+}
 
+void SpaceStringParse(const Text& mess, String& dataa, String& post_symbol) {       // может распарсить строку формата "Ололоев уп" на значащие составные части. Поддерживает простые строки без post_symbol
+  byte space_count = mess.count(" ");
+
+  if (space_count-1) {
+    dataa = mess.getSub(0, " ");
+    post_symbol = mess.getSub(space_count-1, " ");
+  }
+
+  else {
+    dataa = mess;
+    post_symbol = "";
+  }
 }
