@@ -125,6 +125,8 @@ void checkYear() {
   else day_month[1] = 28;
 }
 
+byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors = SURNAME_ERRORS_NUM);
+
 struct timer_data {
   uint32_t start_millis = 0;
   int32_t message_id = 0;

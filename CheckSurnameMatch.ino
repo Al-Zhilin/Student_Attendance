@@ -1,4 +1,4 @@
-byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors) {          //разные варианты совпадения строк и их сравнения
+byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors) {          //разные варианты совпадения строк и их сравнения
   s_input.trim();
   s_list.trim();
   if (s_input == s_list) return 1;                                            //полностью сошлись
@@ -8,18 +8,8 @@ byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors) {    
     String symbol2 = s_list.substring(i, i+2);
     if (symbol1 != symbol2) {
       (*syntax_errors)++;
-      if (*syntax_errors > SURNAME_ERRORS_NUM) return 0;
+      if (*syntax_errors > max_errors) return 0;
     }
   }
   return 2;                                                                  //сошлись с допустимым количеством ошибок
 }
-
-
-/*
-for (byte iter = 0; iter < s_input.length(); iter += sizeof(s_input[0])) {
-    if (s_input[iter] != s_list[iter]) {
-      (*syntax_errors)++;
-      if (*syntax_errors > SURNAME_ERRORS_NUM) return 0;
-    }
-  }
-*/

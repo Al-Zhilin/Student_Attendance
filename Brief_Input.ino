@@ -8,7 +8,7 @@ void briefInput(Text message, String chat) {
 
   post_symbol.reserve(10);
 
-  if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors)) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
+  if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
     presence_mode = 1;
   }
 
@@ -251,8 +251,10 @@ void briefInput(Text message, String chat) {
       }
 
       if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
-        bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_people.surname + "\"", chat);
-        timer.add(bot.lastBotMsg(), 10, error_chat);
+        if (NOTIFY_ERRORS_FIND) {
+          bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_people.surname + "\"", chat);
+          timer.add(bot.lastBotMsg(), 10, chat);
+        }
         //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
         if (valid_lesson[students[ind].subgroup]) {
           address += assumed_length;
