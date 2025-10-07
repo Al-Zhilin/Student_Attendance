@@ -8,24 +8,24 @@ void briefInput(Text message, String chat) {
 
   post_symbol.reserve(10);
 
-  if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
-    presence_mode = 1;
-  }
-
-  for (int i = presence_mode; i <= message.count("\n"); i++) {                  // цикл, каждый раз берем часть сообщения до перевода строки
+  for (int i = 0; i <= message.count("\n"); i++) {                  // цикл, каждый раз берем часть сообщения до перевода строки
     SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
     Text dataa(temp_dataa);
 
     for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                // выискиваем среди всех фамилий нашу
       syntax_errors = 0;
       if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {
-        if (i == presence_mode) input_found = 1;          //если первая строка - фамилия = это сокращенный ввод без условия
+        if (i == 0) input_found = 1;          //если первая строка - фамилия = это сокращенный ввод без условия
         else  input_found = 2;                            //иначе - это сокращенный ввод с условием
         break;
       }
     }
 
     if (input_found)  break;
+  }
+
+  if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
+    presence_mode = 1;
   }
 
   if (input_found == 2 && !isDigit((message.getSub(presence_mode, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
@@ -61,10 +61,11 @@ void briefInput(Text message, String chat) {
 
       if (faza == 2) {    //ищем день
         if (unique_end) break;
-        if (symbol[0] == '.') faza++;       //нашли разделитель дня и месяца (точку) - переходим к извлечению месяца
+        if (symbol[0] == '.') faza++;       //нашли разделитель дня и месяца .(точку) - переходим к извлечению месяца
+        
         else if (isDigit(symbol[0])) {
           found_day = found_day*10 + (symbol[0] - '0');
-          if (found_day > day_month[found_month])  {
+          if (found_day > 31)  {
             serviceMess.edit("Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!");
             return;
           }

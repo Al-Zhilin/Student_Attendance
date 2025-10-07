@@ -1024,7 +1024,7 @@ class Menu {
             mess += i+1;
             if ((i+pre_offset-k) % 7 == 5)  mess += "\n";
             else mess += "\t";
-            if (nka.date.month == t.month && i+1 == t.day) break;
+            if (nka.date.month == t.month && i+1 == week[0]->pon_date.day+6) break;
           }
 
           for (byte i = 0; i < post_offset; i++)  {
@@ -1140,7 +1140,7 @@ class Menu {
           if (!count.mode)  mess += "УП\t";
           if (count.mode == 1) mess += "неУП\t";
 
-          if (start_week_ind == 1 && end_week_ind == file_data.week_off)  mess += "Всего";
+          if (start_week_ind == file_data.week_off && end_week_ind == 1)  mess += "Всего";
           else mess += "В диапазоне";
 
           if (count.mode == 2) {
