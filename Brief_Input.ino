@@ -257,18 +257,37 @@ void briefInput(Text message, String chat) {
           timer.add(bot.lastBotMsg(), 10, chat);
         }
         //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
-        if (valid_lesson[students[ind].subgroup]) {
-          address += assumed_length;
+        if (valid_lesson[assumed_people.subgroup]) {
+          address += surname_length[assumed_people.subgroup];
           address += "]/[0]";
 
           if (presence_mode) {
-            nki_array[students[ind].subgroup].set(address, " "); 
-            need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+            nki_array[assumed_people.subgroup].set(address, " "); 
+            need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
           }
 
-          else if (getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {
-            nki_array[assumed_people.subgroup].set(address, "D");
-            need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
+          else {
+            if (post_symbol == "" && getJsonData(nki_array[assumed_people.subgroup], address, true) != "R") {          // если доп указания отсутствуют
+              nki_array[assumed_people.subgroup].set(address, DISREP_SYMBOL); 
+              need_post[assumed_people.subgroup] = true;
+            }
+
+            else if (post_symbol == "уп" || post_symbol == "Уп" || post_symbol == "УП") {                             // если нужно отметить пропуск как УП
+              nki_array[assumed_people.subgroup].set(address, RESPECT_SYMBOL);
+              need_post[assumed_people.subgroup] = true;
+            }
+
+            else if (post_symbol == "неуп" || post_symbol == "неУП" || post_symbol == "неУп") {                       // если понадобилось отметить пропуск как неУП (например, когда ранее он был отмечен УП)
+              nki_array[assumed_people.subgroup].set(address, DISREP_SYMBOL);
+              need_post[assumed_people.subgroup] = true;
+            }
+
+            else if (post_symbol == "тут" || post_symbol == "Тут") {                                                  // когда нужно отметить присутствие человека
+              nki_array[students[ind].subgroup].set(address, PRESENCE_SYMBOL);
+              need_post[students[ind].subgroup] = true;
+            }
+
+            else bot.sendMessage("Неизвестное дополнительное указание к фамилии \"" + students[ind].surname + "\": \"" + post_symbol + "\"!", chat);
           }
         }
         surname_found = true;

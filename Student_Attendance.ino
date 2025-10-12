@@ -476,7 +476,7 @@ class Sheet {
         
         // == Находим позицию вставки формулы в листе ===
         String form_position = (!count.subgroup) ? Sheet1 : Sheet2;
-        form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + 4);
+        form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + COUNT_COLUMN_OFFSET-1);
         form_position += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
 
         
@@ -515,7 +515,7 @@ class Sheet {
       }
 
       else if (count.mode == 2)   {        //по отдельным предметам неУП
-
+        
       }
 
       else bot.sendMessage("Неизвестный count.mode!", error_chat);

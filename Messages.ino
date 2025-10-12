@@ -74,6 +74,36 @@ void newMsg(FB_msg& msg) {
     commandList(bot.lastUsrMsg());
   }
 
+  else if (msg.text.startsWith("/список")) {
+    String group_list = "";
+    byte mode;
+    if (msg.text == "/список")  {
+      mode = 0;
+      group_list += "Общий список группы:\n\n";
+    }
+    else if (msg.text == "/список1")  {
+      mode = 1;
+      group_list += "Список первой подгруппы:\n\n";
+    }
+    else if (msg.text == "/список2")  {
+      mode = 2;
+      group_list += "Список второй подгруппы:\n\n";
+    }
+    else {
+      bot.sendMessage("И вот чо я должен сделать? Ваще жоский непон щас", msg.chatID);
+      return;
+    }
+    byte total_index = 0;
+    for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
+      if (!mode || students[i].subgroup == mode-1) {
+        group_list += ++total_index;
+        group_list += ". ";
+        group_list += students[i].surname;
+        group_list += "\n";
+      }
+    }
+    bot.sendMessage(group_list, msg.chatID);
+  }
 
 
   else if (msg.text.startsWith("/")) bot.replyMessage("А вот щас вообще не понял, что вы хотите от меня?", bot.lastUsrMsg(), msg.chatID);
