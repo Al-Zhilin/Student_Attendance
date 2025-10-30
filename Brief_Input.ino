@@ -1,6 +1,6 @@
 void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
-  byte found_less = 0, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0;
+  byte found_less[MAX_LESSONS] = {}, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "", post_symbol = "", temp_dataa = "";
   byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не наоборот
@@ -14,14 +14,14 @@ void briefInput(Text message, String chat) {
 
     for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                // выискиваем среди всех фамилий нашу
       syntax_errors = 0;
-      if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {
-        if (!i) input_found = 1;            // без условия
+      if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {       // нашли в строке фамилию из списка
+        if (!i) input_found = 1;     // фамилия найдена сразу же в первой строке ввода
         else {
-           if (CheckSurnameMatch(message.getSub(i-1, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {
-             presence_mode = 1;              // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
-             if (i == 1) input_found = 1;
-           }
-           if (!input_found)  input_found = 2;
+          if (CheckSurnameMatch(message.getSub(i-1, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {       // ищем на предыдущей строке указатель для presence_mode ввода
+            presence_mode = 1;
+          }
+          if (i > presence_mode && isDigit((message.getSub(i-1-presence_mode, "\n").toString())[0])) input_found = 2;         // есть предпосылки полагать, чтоесть условие для ввода
+          else input_found = 1;
         }
         break;
       }
@@ -55,9 +55,9 @@ void briefInput(Text message, String chat) {
       i += charLen; // увеличиваем i на длину символа
 
       if (faza == 0) {    //ищем номер пары
-        if (isDigit(symbol[0])) found_less = found_less*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
-        //-------------------------Здесь добавить условие проверки нескольких пар для ввода---------------------------------------------
-        else if (found_less) faza++;
+        if (isDigit(symbol[0])) found_less[lessons_found] = found_less[lessons_found]*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
+        else if (symbol[0] == ",")  lessons_found++;
+        else if (ignored_symbols.indexOf(symbol) == -1) faza++;       //специально проваливаемся сразу, чтобы не упустить ни буквы ввода
       }
 
       if (faza == 1) {    //ищем слово "пара"
@@ -99,7 +99,7 @@ void briefInput(Text message, String chat) {
     if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
       if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
         if (condition.endsWith("позавчера"))  found_day = real_time.day-2;              //Важно! Сначала проверяем это
-        else if (condition.endsWith("вчера")) found_day = real_time.day-1;              //только потом это, не наоборот!
+        else if (condition.endsWith("вчера")) found_day = real_time.day-1;              //только потом это, не наоборот! (да, я здесь накосячил по глупости изначально)
         else if (condition.endsWith("сегодня")) found_day = real_time.day;
         found_month = real_time.month;
       }
@@ -131,11 +131,11 @@ void briefInput(Text message, String chat) {
     for (byte i = 0; i < (sizeof(lessons)/sizeof(lessons[0])); i++) {
       Time support_time(0, MINUTES_OFFSET);
       if (now_time >= (lessons[i].start - support_time) && now_time <= (lessons[i].end + support_time)) {
-        found_less = i+1;
+        found_less[lessons_found++] = i+1;
         break;
       }
     }
-    if (!found_less) {
+    if (!found_less[lessons_found]) {
       serviceMess.edit("Убедитесь в корректности текущей пары!", 5000);
       return;
     }
@@ -146,7 +146,8 @@ void briefInput(Text message, String chat) {
 
   bool need_post[2] = {false, false};                             //есть ли пропуски у людей этой продгруппы. Если нет - то и смысла отправлять запрос в будущем нету
   bool valid_lesson[2] = {false, false};                          //есть ли вообще в этот день у данной подгруппы эта пара? (да, мне показалось здесь самое время это проверить :) )
-  byte lesson_length[2] = {};                                     //отображает, какая пара для выставления по счету в это день. (Счет всегда с 1, вот номер пары может быть 1)
+  byte table_indexes[2][MAX_LESSONS] = {};                        //индексы в таблице (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
+
   nka.surn = "";
   nka.date.day = found_day;
   nka.date.month = found_month;
@@ -157,13 +158,16 @@ void briefInput(Text message, String chat) {
     getNIndex();
     byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);        //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
     
-    for (byte day_iter = 0; day_iter < week[week_index]->subj_num[nka.dayWeek-1]; day_iter++) {
-      if (week[week_index]->less_nums[nka.dayWeek-1][day_iter] == found_less)  {
-        valid_lesson[i] = true;
-        break;
+    for (byte less = 0; less < lessons_found; less++) {
+      for (byte day_iter = 0; day_iter < week[week_index]->subj_num[nka.dayWeek-1]; day_iter++) {
+        if (week[week_index]->less_nums[nka.dayWeek-1][day_iter] == found_less[less])  {
+          valid_lesson[i] = true;     // убираем выставление Нок для всех пар (хз, мб нужно прерывать выставление ТОЛЬКО для этой пары, но я считаю, что при таком случае пользователь скорее всего ошибся днем и лучше его вовсе остановить)
+          break;
+        }
+        table_indexes[i][less]++;
       }
-      lesson_length[i]++;
-    }
+    //}  // ----------------- ОШИБКА ИЗ-ЗА ЭТОГО МЕСТА!!!!!!!!---------------------------
+         // подумать, докуда должен быть здесь цикл, ну не брать же все оставшееся снизу под этот цикл???
 
     range[i] += charOffset(String(nka.posC), lesson_length[i]);                   // собираем полный вид диапазона для чтения/записи
     range[i] += nka.posI;
@@ -184,11 +188,6 @@ void briefInput(Text message, String chat) {
         else nki_array[i].set(address, "D");
       }
     }
-  }
-
-  if (!valid_lesson[0] || !valid_lesson[1]) {
-    bot.sendMessage("В данный день у " + String((!valid_lesson[0]) ? "1" : "") + String((!valid_lesson[0] && !valid_lesson[1]) ? " и " : "") + String((!valid_lesson[1]) ? "2" : "") + String((!valid_lesson[0] && !valid_lesson[1]) ? " подгрупп" : " подгруппы") + " нет пары под номером " + String(found_less) + "!\nВыставление пропусков соответствующим студентам невозможно!", chat);
-    timer.add(bot.lastBotMsg(), 20, chat);
   }
 
   for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) {                   //обрабатываем фамилии
