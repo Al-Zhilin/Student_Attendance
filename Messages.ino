@@ -4,25 +4,26 @@ void newMsg(FB_msg& msg) {
 
   if (msg.chatID == last_undefined) return;       //неизвестный пишет снова. Просто игнорируем
 
-  for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-    if (msg.chatID == Admins[i])  {
-      undefined_user = false;
-      break;
-    }
-  }
-
   if (undefined_user) {
-    for (byte i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {
-      if (msg.chatID == Groups[i])  {
-      undefined_user = false;
-      break;
+    for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+      if (msg.chatID == Admins[i])  {
+        undefined_user = false;
+        break;
+      }
     }
+
+    if (undefined_user) for (byte i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {
+      if (msg.chatID == Groups[i])  {
+        undefined_user = false;
+        break;
+      }
     }
   }
 
   if (undefined_user) {       //отправитель сообщения не задан как админ или поддерживаемая группа, с такими не общаемся
     last_undefined = msg.chatID;
     bot.sendMessage(msg.username + ", по всей информации обращайтесь к старосте (" + GROUP_COMMANDER + ") или в общую группу!", msg.chatID);
+    bot.sendMessage("Пользователь " + msg.username + " написал: \n" + msg.text, error_chat);
     return;
   }
 
@@ -90,9 +91,10 @@ void newMsg(FB_msg& msg) {
       group_list += "Список второй подгруппы:\n\n";
     }
     else {
-      bot.sendMessage("И вот чо я должен сделать? Ваще жоский непон щас", msg.chatID);
+      bot.sendMessage(F("Уточните корректнее, какой вариант списка вас интересует!"), msg.chatID);
       return;
     }
+    
     byte total_index = 0;
     for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
       if (!mode || students[i].subgroup == mode-1) {

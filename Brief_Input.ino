@@ -15,22 +15,27 @@ void briefInput(Text message, String chat) {
     for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                // выискиваем среди всех фамилий нашу
       syntax_errors = 0;
       if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {
-        if (i == 0) input_found = 1;          //если первая строка - фамилия = это сокращенный ввод без условия
-        else  input_found = 2;                            //иначе - это сокращенный ввод с условием
+        if (!i) input_found = 1;            // без условия
+        else {
+           if (CheckSurnameMatch(message.getSub(i-1, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {
+             presence_mode = 1;              // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
+             if (i == 1) input_found = 1;
+           }
+           if (!input_found)  input_found = 2;
+        }
         break;
       }
     }
-
     if (input_found)  break;
   }
 
-  if (CheckSurnameMatch(message.getSub(0, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {           // есть ключевое слово - воспринимаем введенные фамилии как присутствующих
-    presence_mode = 1;
-  }
-
-  if (input_found == 2 && !isDigit((message.getSub(presence_mode, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
+  //if (input_found == 2 && !isDigit((message.getSub(presence_mode, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
 
   if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
+
+  bot.sendMessage("Presence: " + String(presence_mode) + "\nInput: " + String(input_found), error_chat);
+
+  return;
 
   serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...");
   timer.add(bot.lastUsrMsg(), 15, chat);
@@ -51,6 +56,7 @@ void briefInput(Text message, String chat) {
 
       if (faza == 0) {    //ищем номер пары
         if (isDigit(symbol[0])) found_less = found_less*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
+        //-------------------------Здесь добавить условие проверки нескольких пар для ввода---------------------------------------------
         else if (found_less) faza++;
       }
 
@@ -304,7 +310,7 @@ void briefInput(Text message, String chat) {
   Heap -= ESP.getFreeHeap();
 
   for (byte i = 0; i < 2; i++) {
-    if (!need_post[i] && !presence_mode)  {
+    if (!need_post[i] && !presence_mode || valid_lesson[i])  {
       nki_array[i].clear();
       continue;
     }
