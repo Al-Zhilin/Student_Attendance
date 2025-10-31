@@ -57,7 +57,7 @@ void briefInput(Text message, String chat) {
       if (faza == 0) {    //ищем номер пары
         if (isDigit(symbol[0])) found_less[lessons_found] = found_less[lessons_found]*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
         else if (symbol[0] == ",")  lessons_found++;
-        else if (ignored_symbols.indexOf(symbol) == -1) faza++;       //специально проваливаемся сразу, чтобы не упустить ни буквы ввода
+        else if (ignored_symbols.indexOf(symbol) == -1) {faza++; lessons_found++};       //специально проваливаемся сразу, чтобы не упустить ни буквы ввода
       }
 
       if (faza == 1) {    //ищем слово "пара"
@@ -142,7 +142,10 @@ void briefInput(Text message, String chat) {
   }
 
   uint32_t Heap = ESP.getFreeHeap();
-  FirebaseJson nki_array[2];                                      //будем хранить будущие обьекты для запроса для обеих подгрупп
+
+  //будем хранить будущие обьекты для запроса для обеих подгрупп. Если пара для выставления всего одна - то сразу складываем пропуски (уже имеющиеся и новые) в один обьект, иначе - храним отделно уже имеющиеся и новые в разных обьектах
+  //[подгруппа][0]  или [подгруппа][0,1,...,lessons_found-1 - старые; lessons_found - новые] - 2 варианта по описанному выше принципу
+  FirebaseJson nki_array[2][(lessons_found == 1) ? 1 : lessons_found + 1];
 
   bool need_post[2] = {false, false};                             //есть ли пропуски у людей этой продгруппы. Если нет - то и смысла отправлять запрос в будущем нету
   bool valid_lesson[2] = {false, false};                          //есть ли вообще в этот день у данной подгруппы эта пара? (да, мне показалось здесь самое время это проверить :) )
@@ -166,26 +169,30 @@ void briefInput(Text message, String chat) {
         }
         table_indexes[i][less]++;
       }
-    //}  // ----------------- ОШИБКА ИЗ-ЗА ЭТОГО МЕСТА!!!!!!!!---------------------------
+    }  // ----------------- ОШИБКА ИЗ-ЗА ЭТОГО МЕСТА!!!!!!!! сделал так специально---------------------------
          // подумать, докуда должен быть здесь цикл, ну не брать же все оставшееся снизу под этот цикл???
 
-    range[i] += charOffset(String(nka.posC), lesson_length[i]);                   // собираем полный вид диапазона для чтения/записи
-    range[i] += nka.posI;
-    range[i] += ":";
-    range[i] += charOffset(String(nka.posC), lesson_length[i]);
-    range[i] += nka.posI + people_in_subgr[i] - 1;
+    serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nПолучаю данные из таблицы...");
 
-    tries = 0;
-    while (!GSheet.values.get(&nki_array[i], spreadsheetId, range[i]) && tries < GetTryNum) tries++;
-    if (tries == SetTryNum) bot.sendMessage("ErrorGetRequest!", chat);
+    for (byte less = 0; less < lessons_found; less++) {
+      range[i] += charOffset(String(nka.posC), table_indexes[i][less]);                   // собираем полный вид диапазона для чтения/записи
+      range[i] += nka.posI;
+      range[i] += ":";
+      range[i] += charOffset(String(nka.posC), table_indexes[i][less]);
+      range[i] += nka.posI + people_in_subgr[i] - 1;
 
-    for (byte j = 0; j < people_in_subgr[i]; j++) {
-      String address = "values/[";
-      address += j;
-      address += "]/[0]";
-      if (getJsonData(nki_array[i], address, false) == "invalidPath") {
-        if (!presence_mode) nki_array[i].set(address, "");
-        else nki_array[i].set(address, "D");
+      tries = 0;
+      while (!GSheet.values.get(&nki_array[i][less], spreadsheetId, range[i]) && tries < GetTryNum) tries++;
+      if (tries == SetTryNum) bot.sendMessage("ErrorGetRequest!", chat);
+    
+      for (byte j = 0; j < people_in_subgr[i]; j++) {
+        String address = "values/[";
+        address += j;
+        address += "]/[0]";
+        if (getJsonData(nki_array[i], address, false) == "invalidPath") {
+          if (!presence_mode) nki_array[i].set(address, "");
+          else nki_array[i][less].set(address, "D");
+        }
       }
     }
   }
