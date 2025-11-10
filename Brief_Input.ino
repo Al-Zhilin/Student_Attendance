@@ -5,6 +5,7 @@ void briefInput(Text message, String chat) {
   String supp = "", post_symbol = "", temp_dataa = "";
   byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не наоборот
   FB_Time real_time = bot.getTime(3);
+  MemoryControl MemControl;
 
   post_symbol.reserve(10);
 
@@ -20,7 +21,7 @@ void briefInput(Text message, String chat) {
           if (CheckSurnameMatch(message.getSub(i-1, "\n"), PRESENCE_STRING, &syntax_errors, (String(PRESENCE_STRING).length() > 4 ? 0 : SURNAME_ERRORS_NUM))) {       // ищем на предыдущей строке указатель для presence_mode ввода
             presence_mode = 1;
           }
-          if (i > presence_mode && isDigit((message.getSub(i-1-presence_mode, "\n").toString())[0])) input_found = 2;         // есть предпосылки полагать, чтоесть условие для ввода
+          if (i > presence_mode && isDigit((message.getSub(i-1-presence_mode, "\n").toString())[0])) input_found = 2;         // есть предпосылки полагать, что есть условие для ввода
           else input_found = 1;
         }
         break;
@@ -33,15 +34,11 @@ void briefInput(Text message, String chat) {
 
   if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
 
-  bot.sendMessage("Presence: " + String(presence_mode) + "\nInput: " + String(input_found), error_chat);
-
-  return;
-
   serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nОбрабатываю список...");
   timer.add(bot.lastUsrMsg(), 15, chat);
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
-    String condition = message.getSub(presence_mode, "\n").toString();
+    String condition = message.getSub(presence_mode, "\n").toString(), symbol = "";
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
@@ -51,13 +48,13 @@ void briefInput(Text message, String chat) {
       if ((c & 0x80) == 0x00) charLen = 1; // ASCII
       else if ((c & 0xE0) == 0xC0) charLen = 2; // 2-byte UTF-8
       else if ((c & 0xF0) == 0xE0) charLen = 3; // 3-byte UTF-8 (на всяяякииийй)
-      String symbol = condition.substring(i, i + charLen);
+      symbol = condition.substring(i, i + charLen);
       i += charLen; // увеличиваем i на длину символа
 
       if (faza == 0) {    //ищем номер пары
         if (isDigit(symbol[0])) found_less[lessons_found] = found_less[lessons_found]*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
-        else if (symbol[0] == ",")  lessons_found++;
-        else if (ignored_symbols.indexOf(symbol) == -1) {faza++; lessons_found++};       //специально проваливаемся сразу, чтобы не упустить ни буквы ввода
+        else if (symbol.startsWith(","))  lessons_found++;
+        else if (ignored_symbols.indexOf(symbol) == -1) {faza++; lessons_found++;}       //специально проваливаемся сразу, чтобы не упустить ни буквы следующего ввода
       }
 
       if (faza == 1) {    //ищем слово "пара"
@@ -141,20 +138,16 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  uint32_t Heap = ESP.getFreeHeap();
-
-  //будем хранить будущие обьекты для запроса для обеих подгрупп. Если пара для выставления всего одна - то сразу складываем пропуски (уже имеющиеся и новые) в один обьект, иначе - храним отделно уже имеющиеся и новые в разных обьектах
-  //[подгруппа][0]  или [подгруппа][0,1,...,lessons_found-1 - старые; lessons_found - новые] - 2 варианта по описанному выше принципу
-  FirebaseJson nki_array[2][(lessons_found == 1) ? 1 : lessons_found + 1];
+  //будем хранить будущие обьекты для запроса для обеих подгрупп
+  //[подгруппа][массив Нок для каждой пары, которые уже были выставлены в Таблице]
+  FirebaseJson nki_array[2][lessons_found];
 
   bool need_post[2] = {false, false};                             //есть ли пропуски у людей этой продгруппы. Если нет - то и смысла отправлять запрос в будущем нету
-  bool valid_lesson[2] = {false, false};                          //есть ли вообще в этот день у данной подгруппы эта пара? (да, мне показалось здесь самое время это проверить :) )
-  byte table_indexes[2][MAX_LESSONS] = {};                        //индексы в таблице (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
+  byte table_indexes[2][lessons_found] = {};                        //индексы в таблице (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
 
   nka.surn = "";
   nka.date.day = found_day;
   nka.date.month = found_month;
-  String range[2] = {Sheet1, Sheet2};
 
   for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе. В дальнейшем будем заменять некоторые позиции на фамилии. Гарантирует 'неразрывность' JSON документа
     nka.subgroup = i;
@@ -162,40 +155,48 @@ void briefInput(Text message, String chat) {
     byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);        //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
     
     for (byte less = 0; less < lessons_found; less++) {
+      bool valid_less = false;
       for (byte day_iter = 0; day_iter < week[week_index]->subj_num[nka.dayWeek-1]; day_iter++) {
         if (week[week_index]->less_nums[nka.dayWeek-1][day_iter] == found_less[less])  {
-          valid_lesson[i] = true;     // убираем выставление Нок для всех пар (хз, мб нужно прерывать выставление ТОЛЬКО для этой пары, но я считаю, что при таком случае пользователь скорее всего ошибся днем и лучше его вовсе остановить)
+          valid_less = true;
           break;
         }
         table_indexes[i][less]++;
       }
-    }  // ----------------- ОШИБКА ИЗ-ЗА ЭТОГО МЕСТА!!!!!!!! сделал так специально---------------------------
-         // подумать, докуда должен быть здесь цикл, ну не брать же все оставшееся снизу под этот цикл???
+      if (!valid_less) {
+        // убираем выставление Нок для всех пар (хз, мб нужно прерывать выставление ТОЛЬКО для этой пары, но я считаю, что при таком случае пользователь скорее всего ошибся днем и лучше его вовсе остановить)
+        bot.sendMessage("В данный день у " + String(i+1) + " подгруппы нет пары под номером " + String(found_less[less]) + "!\nПересмотрите сокращенный ввода заново!", chat);
+        return;
+      }
+    }
 
     serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nПолучаю данные из таблицы...");
 
     for (byte less = 0; less < lessons_found; less++) {
-      range[i] += charOffset(String(nka.posC), table_indexes[i][less]);                   // собираем полный вид диапазона для чтения/записи
-      range[i] += nka.posI;
-      range[i] += ":";
-      range[i] += charOffset(String(nka.posC), table_indexes[i][less]);
-      range[i] += nka.posI + people_in_subgr[i] - 1;
+      String range = ((!i) ? Sheet1 : Sheet2);
+      range += charOffset(String(nka.posC), table_indexes[i][less]);                   // собираем полный вид диапазона для чтения/записи
+      range += nka.posI;
+      range += ":";
+      range += charOffset(String(nka.posC), table_indexes[i][less]);
+      range += nka.posI + people_in_subgr[i] - 1;
 
       tries = 0;
-      while (!GSheet.values.get(&nki_array[i][less], spreadsheetId, range[i]) && tries < GetTryNum) tries++;
+      while (!GSheet.values.get(&nki_array[i][less], spreadsheetId, range) && tries < GetTryNum) tries++;
       if (tries == SetTryNum) bot.sendMessage("ErrorGetRequest!", chat);
     
       for (byte j = 0; j < people_in_subgr[i]; j++) {
         String address = "values/[";
         address += j;
         address += "]/[0]";
-        if (getJsonData(nki_array[i], address, false) == "invalidPath") {
-          if (!presence_mode) nki_array[i].set(address, "");
+        if (getJsonData(nki_array[i][less], address, false) == "invalidPath") {
+          if (!presence_mode) nki_array[i][less].set(address, "");
           else nki_array[i][less].set(address, "D");
         }
       }
     }
   }
+
+  serviceMess.edit("Обрабатываю введенные фамилии...");
 
   for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) {                   //обрабатываем фамилии
     SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
@@ -214,39 +215,15 @@ void briefInput(Text message, String chat) {
 
       if (func_res == 1) {       //если фамилия безошибочно найдена в списке фамилий
         //------------------Здесь ставим Нку нужному человеку-----------------------------
-        if (valid_lesson[students[ind].subgroup]) {
-          address += surname_length[students[ind].subgroup];
-          address += "]/[0]";
+        
+        address += surname_length[students[ind].subgroup];
+        address += "]/[0]";
 
-          if (presence_mode) {
-            nki_array[students[ind].subgroup].set(address, " "); 
-            need_post[students[ind].subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
-          }
-
-          else {
-            if (post_symbol == "" && getJsonData(nki_array[students[ind].subgroup], address, true) != "R") {          // если доп указания отсутствуют
-              nki_array[students[ind].subgroup].set(address, DISREP_SYMBOL); 
-              need_post[students[ind].subgroup] = true;
-            }
-
-            else if (post_symbol == "уп" || post_symbol == "Уп" || post_symbol == "УП") {                             // если нужно отметить пропуск как УП
-              nki_array[students[ind].subgroup].set(address, RESPECT_SYMBOL);
-              need_post[students[ind].subgroup] = true;
-            }
-
-            else if (post_symbol == "неуп" || post_symbol == "неУП" || post_symbol == "неУп") {                       // если понадобилось отметить пропуск как неУП (например, когда ранее он был отмечен УП)
-              nki_array[students[ind].subgroup].set(address, DISREP_SYMBOL);
-              need_post[students[ind].subgroup] = true;
-            }
-
-            else if (post_symbol == "тут" || post_symbol == "Тут") {                                                  // когда нужно отметить присутствие человека
-              nki_array[students[ind].subgroup].set(address, PRESENCE_SYMBOL);
-              need_post[students[ind].subgroup] = true;
-            }
-
-            else bot.sendMessage("Неизвестное дополнительное указание к фамилии \"" + students[ind].surname + "\": \"" + post_symbol + "\"!", chat);
-          }
+        for (byte less = 0; less < lessons_found; less++) {
+          nki_array[students[ind].subgroup][less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[students[ind].subgroup][less], address, true)));
+          need_post[students[ind].subgroup] = true;
         }
+      
         surname_found = true;
         break;
       }
@@ -269,39 +246,14 @@ void briefInput(Text message, String chat) {
           timer.add(bot.lastBotMsg(), 10, chat);
         }
         //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
-        if (valid_lesson[assumed_people.subgroup]) {
-          address += surname_length[assumed_people.subgroup];
-          address += "]/[0]";
+        address += assumed_length;
+        address += "]/[0]";
 
-          if (presence_mode) {
-            nki_array[assumed_people.subgroup].set(address, " "); 
-            need_post[assumed_people.subgroup] = true;                               //есть фамилии в этой подгруппе для выставлния, значит будем вызывать функцию отправки запроса
-          }
-
-          else {
-            if (post_symbol == "" && getJsonData(nki_array[assumed_people.subgroup], address, true) != "R") {          // если доп указания отсутствуют
-              nki_array[assumed_people.subgroup].set(address, DISREP_SYMBOL); 
-              need_post[assumed_people.subgroup] = true;
-            }
-
-            else if (post_symbol == "уп" || post_symbol == "Уп" || post_symbol == "УП") {                             // если нужно отметить пропуск как УП
-              nki_array[assumed_people.subgroup].set(address, RESPECT_SYMBOL);
-              need_post[assumed_people.subgroup] = true;
-            }
-
-            else if (post_symbol == "неуп" || post_symbol == "неУП" || post_symbol == "неУп") {                       // если понадобилось отметить пропуск как неУП (например, когда ранее он был отмечен УП)
-              nki_array[assumed_people.subgroup].set(address, DISREP_SYMBOL);
-              need_post[assumed_people.subgroup] = true;
-            }
-
-            else if (post_symbol == "тут" || post_symbol == "Тут") {                                                  // когда нужно отметить присутствие человека
-              nki_array[students[ind].subgroup].set(address, PRESENCE_SYMBOL);
-              need_post[students[ind].subgroup] = true;
-            }
-
-            else bot.sendMessage("Неизвестное дополнительное указание к фамилии \"" + students[ind].surname + "\": \"" + post_symbol + "\"!", chat);
-          }
+        for (byte less = 0; less < lessons_found; less++) {
+          nki_array[students[ind].subgroup][less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[students[ind].subgroup][less], address, true)));
+          need_post[students[ind].subgroup] = true;
         }
+
         surname_found = true;
       }
 
@@ -313,26 +265,50 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  Heap -= ESP.getFreeHeap();
+  serviceMess.edit("Выставляю пропуски...");
 
-  for (byte i = 0; i < 2; i++) {
-    if (!need_post[i] && !presence_mode || valid_lesson[i])  {
-      nki_array[i].clear();
+  for (byte i = 0; i < 2; i++) {                      // выставление
+    if (!need_post[i] && !presence_mode)  {
+      for (byte less = 0; less < lessons_found; less++) nki_array[i][less].clear();
       continue;
     }
 
     String answ = "";
     tries = 0;
 
-    while (!GSheet.values.update(&answ, spreadsheetId, range[i], &nki_array[i]) && tries < SetTryNum) {
-      tries++;
-    }
+    for (byte less = 0; less < lessons_found; less++) {
+      String range = ((!i) ? Sheet1 : Sheet2);
+      range += charOffset(String(nka.posC), table_indexes[i][less]);                   // собираем полный вид диапазона для чтения/записи
+      range += nka.posI;
+      range += ":";
+      range += charOffset(String(nka.posC), table_indexes[i][less]);
+      range += nka.posI + people_in_subgr[i] - 1;
 
-    nki_array[i].clear();
-    if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
+      while (!GSheet.values.update(&answ, spreadsheetId, range, &nki_array[i][less]) && tries < SetTryNum) {
+        tries++;
+      }
+      nki_array[i][less].clear();
+      if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
+    }
   }
 
-  serviceMess.edit("Сокращенный ввод обработан!\nRAM занятно: " + String(Heap/1024) + " кБ.", 5000);
+  serviceMess.edit("Сокращенный ввод обработан!\nRAM занято: " + String((MemControl.getHeap(false)-MemControl.getHeap(true))/1024) + " кБ.", 5000);
+}
+
+String UpdateArrayCell(byte presence_m, String post_symbol, String old_nka) {
+  if (presence_m)  return " ";
+
+  else {
+    if (post_symbol == "" && old_nka != "R") return DISREP_SYMBOL;          // если доп указаний нет и в таблице уже не был высталвен пропуск по УП
+    if (post_symbol == "уп" || post_symbol == "Уп" || post_symbol == "УП")  return RESPECT_SYMBOL;
+    if (post_symbol == "неуп" || post_symbol == "неУп" || post_symbol == "неУП")  return DISREP_SYMBOL;
+    if (post_symbol == "тут" || post_symbol == "Тут" || post_symbol == "ТУТ") return PRESENCE_SYMBOL;
+    else {
+      bot.sendMessage(F("Некорректный post_symbol обнаружен в сокращенном вводе!\nСделаем вид, что его вообще не было"), error_chat);
+      return DISREP_SYMBOL;
+    }
+  }
+  return "";
 }
 
 String getJsonData (FirebaseJson &object, String &addr, bool show_error) {

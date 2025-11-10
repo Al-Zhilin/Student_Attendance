@@ -1,4 +1,5 @@
 #include "types.h"  // Заголовок, где объявлен класс Time
+#define MIN_FREE_HEAP 50                                                                       //минимальный объем свободной оперативной памяти во время выполнения программы (порог нужен для оценки при мониторинге), кБ
 
 // Конструкторы
 Time::Time(byte h, byte m) : hours(h), minutes(m) {}
@@ -79,4 +80,23 @@ bool Time::operator <=(const Time &other) const {
 
 bool Time::operator !=(const Time &other) const {
     return !(*this == other);
+}
+
+
+MemoryControl::MemoryControl() {
+    _start_heap = ESP.getFreeHeap();
+}
+
+bool MemoryControl::check() {                    // проверяем свободное количество
+    if (ESP.getFreeHeap() < MIN_FREE_HEAP * 1024)  return false;
+    return true;
+}
+
+uint32_t MemoryControl::getHeap(bool mode) {     // false - start_heap; true - current heap
+    if (!mode) return _start_heap;
+    return ESP.getFreeHeap();
+}
+
+uint32_t MemoryControl::totalHeap() {            // общий размер памяти
+    return ESP.getHeapSize();
 }

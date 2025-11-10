@@ -31,4 +31,15 @@ public:
     bool operator !=(const Time &other) const;
 };
 
+class MemoryControl {
+  private:
+    uint32_t _start_heap = 0;
+
+  public:
+    MemoryControl();
+    bool check();
+    uint32_t getHeap(bool mode);
+    uint32_t totalHeap();
+};
+
 #endif

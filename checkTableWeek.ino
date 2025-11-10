@@ -1,6 +1,5 @@
 int8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
   FB_Time realTime = bot.getTime(3);                            //структура реального времени
-  uint32_t Heap;
 
   serviceMess.edit("Проверяю актуальность недели в таблице...");
 
@@ -55,9 +54,11 @@ int8_t checkTableWeek() {            //функция проверки и дос
   serviceMess.edit("Нужно достроить недель: " + String(weeksToBuild));
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  byte tableLen[2] = {};        //длина таблицы для 2 четностей подгруппы, таблица в которой сейчас достраивается
+  byte tableLen[2] = {};        //длина таблицы для 2 четностей той подгруппы, таблица в которой сейчас достраивается
 
-  if (ESP.getFreeHeap()/1024 < 40)  {
+  MemoryControl MemControl;
+
+  if (!MemControl.check())  {
     bot.sendMessage(F("Возможна нехватка свободной памяти!\nКритично!"), error_chat);
     return -1;                     // подумать!
   }
@@ -87,8 +88,6 @@ int8_t checkTableWeek() {            //функция проверки и дос
       FirebaseJson request;         //храним по очереди все запросы перед добавлением в массив запросовE
 
       serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2");
-      Heap = ESP.getFreeHeap();     //засекаем количество свободной памяти до сборки JSON`ов
-
 
       //---------------------------------------------------------Сopy-Paste запрос---------------------------------------------------------
       if (!i)
@@ -115,6 +114,11 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
       requests.add(request);
       request.clear();
+
+      if (!MemControl.check()) {
+        bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
+        requests.clear();
+      }
       //---------------------------------------------------------Сopy-Paste запрос---------------------------------------------------------
 
 
@@ -135,6 +139,11 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
       requests.add(request);
       request.clear();
+
+      if (!MemControl.check()) {
+        bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
+        requests.clear();
+      }
       //------------------------------------------------------Запрос очистки диапазона------------------------------------------------------
 
 
@@ -196,10 +205,16 @@ int8_t checkTableWeek() {            //функция проверки и дос
       request.set("updateCells/fields", "userEnteredValue");
       requests.add(request);
       request.clear();
+
+      if (!MemControl.check()) {
+        bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
+        requests.clear();
+        request.clear();
+      }
       //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
 
 
-      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String((Heap - ESP.getFreeHeap())/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
+      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String((MemControl.getHeap(false) - MemControl.getHeap(true))/1024) + " кБ в RAM\nВсего - " + String(MemControl.totalHeap()/1024) + " кБ, Свободно - " + String(MemControl.getHeap(true)/1024) + " кБ");
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
