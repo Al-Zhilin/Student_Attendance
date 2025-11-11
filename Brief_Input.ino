@@ -257,6 +257,7 @@ void briefInput(Text message, String chat) {
         surname_found = true;
       }
 
+
       surname_length[students[ind].subgroup]++;         //см. описание к переменной выше
     }
     if (!surname_found) {

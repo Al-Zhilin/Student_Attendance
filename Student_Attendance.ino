@@ -531,7 +531,7 @@ class Menu {
   private:
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
-    String s_menu[2] = {"Редактировать", "Подсчитать"};
+    String s_menu[] = {"Редактировать", "Подсчитать", "Статистика"};
     String way = "10000";
     byte start_week_ind = 0, end_week_ind = 0, unknown_ind = 0;
 
@@ -566,12 +566,13 @@ class Menu {
 
     void menuEdit (String comm, String user) {
       FB_Time t = bot.getTime(3);
+      static N_edited = false;
 
-      if (comm == "На главную") {
+      if (comm == "На главную" && way != "0") {
         way = "0";
         ret_command = true;
       }
-      if (comm == "Назад")  {
+      if (comm == "Назад" && way != "0")  {
         way.remove(way.length()-1);
         ret_command = true;
       }
@@ -642,6 +643,7 @@ class Menu {
           }
 
           else if (comm == "Все УП") {                                                 // выбрал "поставить УП на все пары в дне"
+            N_edited = true;
             nka.nki = "";
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '+';
             reading_flag = false;
@@ -650,6 +652,7 @@ class Menu {
           }
 
           else if (comm == "Все неУП") {                                               // выбрал "поставить неУП на все пары в дне"
+            N_edited = true;
             nka.nki = "";
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '-';
             reading_flag = false;
@@ -658,6 +661,7 @@ class Menu {
           }
 
           else if (comm == "Нет пропусков") {                                          // выбрал "убрать пропуски на всех парах в дне"
+            N_edited = true;
             nka.nki = "";
             for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += ' ';
             reading_flag = false;
@@ -675,7 +679,10 @@ class Menu {
             range += ":";
             range += charOffset(nka.posC, week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]-1);
             range += nka.posI;
-            list.SetN(range);
+            if (N_edited) {
+              list.SetN(range);
+              N_edited = false;
+            }
             way = "01";
             edit_page(0);
             return;
@@ -734,6 +741,7 @@ class Menu {
             if (comm == "УП") nka.nki[nka_ind] = '+';
             else if (comm == "неУП") nka.nki[nka_ind] = '-';
             else nka.nki[nka_ind] = ' ';
+            N_edited = true;
           }
           way = "011";
           reading_flag = false;
@@ -749,7 +757,7 @@ class Menu {
         else  bot.sendMessage("err_menu", error_chat);
       }
 
-      if (way.startsWith("02")) {                                  // ветка подсчета
+      else if (way.startsWith("02")) {                                  // ветка подсчета
         if (way == "02") {
           nka.surn = "";
           nka.nki = "";
@@ -881,6 +889,12 @@ class Menu {
         }
 
         else bot.sendMessage("err_menu2");
+      }
+
+      else if (way.startsWith("03")) {                    // ветка статистики
+        if (way == "03") {                    // стартовая страница
+
+        }
       }
     }
 
