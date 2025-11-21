@@ -438,87 +438,112 @@ class Sheet {
     }
 
     void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
-      if (!count.mode || count.mode == 1)  {                                  // все предметы УП ИЛИ все предметы неУП
-        String formula = "", diapason = "";                                      // строка для сборки формулы имеет конечный вид =СЧЁТЕСЛИ(FILTER(C581:U617; ОСТАТ(СТРОКА(C581:C617)-588; 23)=0);"D")
-        byte table_len[2] = {};                                                                       // горизонтальная длина таблицы
-        bool prev = false;
+      String formula = "", diapason;                                                  // строки для сборки формулы и диапазона
+      byte table_len[2] = {};                                                         // горизонтальная длина таблицы
+      bool prev = false;
 
-        for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {          // Высчитываем len (горизонталную длины недели в таблице)
-          for (int s = 0; s < 7; s++) {
-            if (week[count.subgroup + 2*parity_iter]->subj_num[s] == 0) continue;
-            if (prev) table_len[parity_iter] += 1;
-            table_len[parity_iter] += week[count.subgroup + 2*parity_iter]->subj_num[s];
-            prev = true;
-          }
+      for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {                    // Высчитываем len (горизонталную длины недели в таблице)
+        for (int s = 0; s < 7; s++) {
+          if (week[count.subgroup + 2*parity_iter]->subj_num[s] == 0) continue;
+          if (prev) table_len[parity_iter] += 1;
+          table_len[parity_iter] += week[count.subgroup + 2*parity_iter]->subj_num[s];
+          prev = true;
         }
+      }
+      
+      // == Находим позицию вставки формулы в листе === (В данной версии пока так же одинаокова для любого варианта подсчета)
+      String form_position = (!count.subgroup) ? Sheet1 : Sheet2;
+      form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + 5-1);
+      form_position += people_list_i + offset[count.subgroup] * (end_week-1) + count.surn_ind;
 
+
+      if (!count.mode || count.mode == 1)  {                                  // все предметы УП ИЛИ все предметы неУП
         // === Собираем диапазон ===
-        diapason += less_name_c;                                        // символьное начало диапазона
+        diapason = less_name_c;                                                    // символьное начало диапазона
         diapason += people_list_i + offset[count.subgroup] * (start_week-1);        // численное начало диапазона
         diapason += ":";
         diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
         diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
-        // === Собираем диапазон ===
 
-        // === Собираем саму формулу ===
-        formula += "=СЧЁТЕСЛИ(FILTER(";
+        // === Собираем формулу === (в данном случае конечный вид: =COUNTIF(FILTER(C581:U617,MOD(ROW(C581:U617)-588,23)=0),"D")
+        formula = "=COUNTIF(FILTER(";
         formula += diapason;
-        formula += "; ОСТАТ(СТРОКА(";
+        formula += ";MOD(ROW(";
         formula += diapason;
         formula += ")-";
         formula += people_list_i + offset[count.subgroup] * (start_week-1) + count.surn_ind;
-        formula += "; ";
+        formula += ";";
         formula += offset[count.subgroup];
-        formula += ")=0); \"";
+        formula += ")=0);\"";
         formula += (!count.mode) ? RESPECT_SYMBOL : DISREP_SYMBOL;                                // в зависимости от вида поиска ищем конкретный символ
         formula += "\")";
-
-        
-        // == Находим позицию вставки формулы в листе ===
-        String form_position = (!count.subgroup) ? Sheet1 : Sheet2;
-        form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + COUNT_COLUMN_OFFSET-1);
-        form_position += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
-
-        
-        // === Устанавливаем формулу в листе ===
-        FirebaseJson response, valueRange;
-        valueRange.add("range", form_position);
-        valueRange.add("majorDimension", "ROWS");
-        valueRange.set("values/[0]/[0]", formula);
-
-        byte tries = 0;
-        while (!GSheet.values.update(&response, spreadsheetId, form_position, &valueRange) && tries < SetTryNum) tries++;
-        if (tries == SetTryNum) bot.sendMessage("updateError");
-        valueRange.clear();
-
-        /*String responseStr;
-        response.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
-        bot.sendMessage(responseStr, error_chat);*/
-
-        response.clear();
-
-
-        // === Получаем итоговую цифру подсчета ===
-        tries = 0;
-        FirebaseJsonData result_object;
-        while (!GSheet.values.get(&response, spreadsheetId, form_position) && tries < GetTryNum) tries++;
-        if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
-
-        /*String responseStr;
-        response.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
-        bot.sendMessage(responseStr, error_chat);*/
-
-        response.get(result_object, "values/[0]/[0]");
-        response.clear();
-        count.total = result_object.intValue;
-        result_object.clear();
       }
 
       else if (count.mode == 2)   {        //по отдельным предметам неУП
-        
+        // === Собираем диапазон ===
+        diapason = less_name_c;
+        diapason += less_name_i + offset[count.subgroup] * (start_week-1);
+        diapason += ":";
+        diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
+        diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
+
+        // === Собираем формулу ===, в данном случае ее конечный вид:
+        // =COUNTIFS(FILTER(C244:U284; MOD(ROW(C244:U284)-244;24)=0); "Физ практикум (лб)"; FILTER(C244:U284; MOD(ROW(C244:U284)-244-2;24)=0); "D")
+        formula = "=COUNTIFS(FILTER(";
+        formula += diapason;
+        formula += ";MOD(ROW(";
+        formula += diapason;
+        formula += ")-";
+        formula += less_name_i + offset[count.subgroup] * (start_week-1);
+        formula += ";";
+        formula += offset[count.subgroup];
+        formula += ")=0);\"";
+        formula += count.subject;
+        formula += "\";FILTER(";
+        formula += diapason;
+        formula += ";MOD(ROW(";
+        formula += diapason;
+        formula += ")-";
+        formula += less_name_i + offset[count.subgroup] * (start_week-1);
+        formula += "-";
+        formula += 2+count.surn_ind;
+        formula += ";";
+        formula += offset[count.subgroup];
+        formula += ")=0);\"D\")";
       }
 
       else bot.sendMessage("Неизвестный count.mode!", error_chat);
+      // === Устанавливаем формулу в листе ===
+      FirebaseJson response, valueRange;
+      valueRange.add("range", form_position);
+      valueRange.add("majorDimension", "ROWS");
+      valueRange.set("values/[0]/[0]", formula);
+
+      byte tries = 0;
+      while (!GSheet.values.update(&response, spreadsheetId, form_position, &valueRange) && tries < SetTryNum) tries++;
+      if (tries == SetTryNum) bot.sendMessage("updateError");
+      valueRange.clear();
+      /*
+      String responseStr;
+      response.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
+      bot.sendMessage(responseStr, error_chat);
+      */
+      response.clear();
+
+      // === Получаем итоговую цифру подсчета ===
+      tries = 0;
+      FirebaseJsonData result_object;
+      while (!GSheet.values.get(&response, spreadsheetId, form_position) && tries < GetTryNum) tries++;
+      if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
+
+      /*String responseStr;
+      response.toString(responseStr, true);                 //Вывод ответа от Google Sheets API для отладки
+      bot.sendMessage(responseStr, error_chat);*/
+
+      response.get(result_object, "values/[0]/[0]");
+      response.clear();
+      count.total = result_object.intValue;
+      result_object.clear();
     }
 
     bool ready() {
@@ -531,7 +556,7 @@ class Menu {
   private:
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
-    String s_menu[] = {"Редактировать", "Подсчитать", "Статистика"};
+    const String s_menu[3] = {"Редактировать", "Подсчитать", "Статистика"};
     String way = "10000";
     byte start_week_ind = 0, end_week_ind = 0, unknown_ind = 0;
 
@@ -566,7 +591,7 @@ class Menu {
 
     void menuEdit (String comm, String user) {
       FB_Time t = bot.getTime(3);
-      static N_edited = false;
+      static bool N_edited = false;
 
       if (comm == "На главную" && way != "0") {
         way = "0";
@@ -877,7 +902,7 @@ class Menu {
             if (comm == subjects[i]) {
               count.subject = comm;
               calculate_page(3);
-              way = "0211";
+              way = "0212";
               return;
             }
           }
@@ -1152,17 +1177,16 @@ class Menu {
           mess = count.surn;
           mess += "\t";
           if (!count.mode)  mess += "УП\t";
-          if (count.mode == 1) mess += "неУП\t";
+          else mess += "неУП\t";
 
           if (start_week_ind == file_data.week_off && end_week_ind == 1)  mess += "Всего";
           else mess += "В диапазоне";
 
-          if (count.mode == 2) {
-            mess += "неУп\tпо \"";
-            if (count.subject != "") mess += count.subject;                             //хз, на всяяякийййй
-            else mess += "unknown lesson";
-            mess += "\"";
+          if (count.mode == 2)  {
+            mess += "\n";
+            mess += count.subject;
           }
+
           mess += "\n";
           mess += count.total;
           mess += "\nНа главную";

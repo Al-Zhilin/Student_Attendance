@@ -3,7 +3,7 @@ void briefInput(Text message, String chat) {
   byte found_less[MAX_LESSONS] = {}, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "", post_symbol = "", temp_dataa = "";
-  byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не наоборот
+  byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не по стандарту
   FB_Time real_time = bot.getTime(3);
   MemoryControl MemControl;
 
