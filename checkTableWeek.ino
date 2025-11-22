@@ -89,7 +89,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
     dateToWeek.month = week[i]->pon_date.month;
     sumDate(&dateToWeek, 6);
 
-    for (byte iter = 0; iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель
+    for (byte iter = ((week_off == 1) ? 1 : 0); iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель. Учитывает, что первые 2 недели в таблице всегда построены
 
       FirebaseJsonArray requests;     //массив запросов
       FirebaseJson request;         //храним по очереди все запросы перед добавлением в массив запросовE

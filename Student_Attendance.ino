@@ -15,7 +15,7 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
-  int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
+  int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщения в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
 } file_data;
@@ -23,7 +23,7 @@ struct fileData {                                                 // струк�
 FileData settings_file(&FFat, "/data.dat", 'Z', &file_data, sizeof(file_data));
 
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
-byte week_off = 1;                                                // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
+byte week_off = 1;   // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
 FileData week_file(&FFat, "/weekdata.dat", 'V', &week_off, sizeof(week_off));
 
 const String months[] = {               //сокращенные названия всех месяцев
@@ -439,7 +439,7 @@ class Sheet {
       valueRange.clear();
     }
 
-    void Counting(byte start_week = 1, byte end_week = week_off) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
+    void Counting(byte start_week, byte end_week) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
       String formula = "", diapason;                                                  // строки для сборки формулы и диапазона
       byte table_len[2] = {};                                                         // горизонтальная длина таблицы
 
@@ -476,6 +476,7 @@ class Sheet {
         diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
 
         // === Собираем формулу === (в данном случае конечный вид: =COUNTIF(FILTER(C581:U617,MOD(ROW(C581:U617)-588,23)=0),"D")
+        formula.reserve(65);
         formula = "=COUNTIF(FILTER(";
         formula += diapason;
         formula += ";MOD(ROW(";
@@ -499,6 +500,7 @@ class Sheet {
 
         // === Собираем формулу ===, в данном случае ее конечный вид:
         // =COUNTIFS(FILTER(C244:U284; MOD(ROW(C244:U284)-244;24)=0); "Физ практикум (лб)"; FILTER(C244:U284; MOD(ROW(C244:U284)-244-2;24)=0); "D")
+        formula.reserve(110 + count.subject.length());
         formula = "=COUNTIFS(FILTER(";
         formula += diapason;
         formula += ";MOD(ROW(";
@@ -519,7 +521,9 @@ class Sheet {
         formula += 2+count.surn_ind;
         formula += ";";
         formula += offset[count.subgroup];
-        formula += ")=0);\"D\")";
+        formula += ")=0);\"";
+        formula += DISREP_SYMBOL;
+        formula += "\")";
       }
 
       else bot.sendMessage("Неизвестный count.mode!", error_chat);
@@ -566,13 +570,20 @@ class Menu {
   private:
     bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
-    const String s_menu[3] = {"Редактировать", "Подсчитать", "Статистика"};
-    String way = "10000";
-    byte start_week_ind = 0, end_week_ind = 0, unknown_ind = 0;
+    const String s_menu[4] = {"Редактировать", "Подсчитать", "Статистика", "Настройки"};
+    String way = "0";
+    byte unknown_ind = 0;
+    struct week_diapason {
+      byte start = 0;
+      byte end = 0;
+    }; 
+    week_diapason local_diapason;         // локально для изменения в менюшках, для адаптивности в подсчете и перед утверждением в настройках границ промежуточной аттестации
+    week_diapason total_diapason;         // глобально для настроек диапазона по умолчанию
 
   public:
-    void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {              // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
-      if (way == "10000") way = "0";
+    void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {        // функция показа стартовой страницы
+      // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
+      way.reserve(7);
 
       bot.notify(false);
       if (!mode)  {
@@ -589,17 +600,17 @@ class Menu {
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         if (file_status == FD_WRITE || file_status == FD_ADD) {
-          bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1], Admins[i]);
+          bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
           file_data.menu_id[i] = bot.lastBotMsg();
         }
-        else  bot.editMenu(file_data.menu_id[i], s_menu[0] + "\t" + s_menu[1], Admins[i]);
+        else  bot.editMenu(file_data.menu_id[i], s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
       }
 
       bot.notify(false);
       settings_file.update();
     }
 
-    void menuEdit (String comm, String user) {
+    void menuEdit (String comm, String user) {        // обработка нажатий в меню
       FB_Time t = bot.getTime(3);
       static bool N_edited = false;
 
@@ -625,6 +636,18 @@ class Menu {
           return;
         }
 
+        if (comm == s_menu[2]) {          // нажали кнопку "Статистика"
+          way = "03";
+          stat_page(0);
+          return;
+        }
+
+        if (comm == s_menu[3]) {          // нажали кнопку "Настройки"
+          way = "04";
+          settings_page(0);
+          return;
+        }
+
         if (ret_command)  {
           ret_command = false;
           start_page(1);
@@ -633,7 +656,7 @@ class Menu {
         else  bot.sendMessage("err_menu", error_chat);
       }
 
-      if (way.startsWith("01")) {                                                     // ветка редактирования 
+      if (way.startsWith("01")) {                                                     // "бэкенд" ветки редактирования 
         if (way == "01") {                                                            // отображается страница выбора фамилии
           nka.surn = "";
           nka.nki = "";
@@ -792,7 +815,7 @@ class Menu {
         else  bot.sendMessage("err_menu", error_chat);
       }
 
-      else if (way.startsWith("02")) {                                  // ветка подсчета
+      else if (way.startsWith("02")) {                                  // "бэкенд" ветки подсчета
         if (way == "02") {
           nka.surn = "";
           nka.nki = "";
@@ -845,7 +868,7 @@ class Menu {
 
         if (way == "0212") {                     // нажата кнопка на меню выбора диапазона подсчета          
           if (comm == "Готово") {
-            list.Counting(end_week_ind, start_week_ind);
+            list.Counting(local_diapason.end, local_diapason.start);
             calculate_page(5);
           }
 
@@ -897,11 +920,11 @@ class Menu {
         }
 
         else if (way == "02121") {                    // нажатия на странице выбора статуса недели (Начало диапазона, конец или только эта неделя)
-          if (comm == "Начало") start_week_ind = unknown_ind;
-          else if (comm == "Конец") end_week_ind = unknown_ind;
+          if (comm == "Начало") local_diapason.start = unknown_ind;
+          else if (comm == "Конец") local_diapason.end = unknown_ind;
           else if (comm == "Начало и конец") {
-            start_week_ind = unknown_ind;
-            end_week_ind = unknown_ind;
+            local_diapason.start = unknown_ind;
+            local_diapason.end = unknown_ind;
           }
 
           way = "0212";
@@ -928,14 +951,36 @@ class Menu {
         else bot.sendMessage("err_menu2");
       }
 
-      else if (way.startsWith("03")) {                    // ветка статистики
+      else if (way.startsWith("03")) {                    // "бэкенд" ветки статистики
         if (way == "03") {                    // стартовая страница
 
         }
       }
+
+      else if (way.startsWith("04")) {     // "бэкенд" ветки настроек
+        if (way == "04") {                                  // главная страница с выбором настройки
+          if (ret_command)  {
+            ret_command = false;
+            settings_page(0);
+          }
+
+          else if (comm == "Сроки промежуточной аттестации") {
+            calculate_page(3);          // по факту здесь отлично подходит уже готовая функция отображения списка недель
+            way = "0411";
+            return;
+          }
+        }
+
+        if (way == "0411") {            // обработка нажатий на неделю в показанном списке
+          if (ret_command)  {
+            ret_command = false;
+            calculate_page(3);
+          }
+        }
+      }
     }
 
-    void edit_page(byte edit_depth) {
+    void edit_page(byte edit_depth) {               // "фронтенд" страниц подменю "Редактировать"
       FB_Time t = bot.getTime(3);
       String mess = "";
       switch (edit_depth) {
@@ -1098,7 +1143,7 @@ class Menu {
       }
     }
 
-    void calculate_page(byte calculate_depth) {
+    void calculate_page(byte calculate_depth) {     // "фронтенд" страниц подменю "Подсчитать"
       String mess = "";
       mess.reserve(1024);                             // должно чуточку ускорить работу со стрингами, уберегая от реаллокаций и иных плохостей
       switch (calculate_depth) {
@@ -1118,8 +1163,8 @@ class Menu {
           mess += "\n";
           mess += "Общее УП\tОбщее неУП\tПо предметам (неУП)\n";
           mess += "Назад\tНа главную";
-          start_week_ind = week_off;
-          end_week_ind = 1;
+          local_diapason.start = week_off;
+          local_diapason.end = 1;
         break;
 
         case 2:                                     // страница выбора предмета (если выбран варинат подсчета по предмету)
@@ -1140,9 +1185,9 @@ class Menu {
 
           for (byte i = 0; i < week_off; i++) {
             
-            if (start_week_ind == week_off-i || end_week_ind == week_off-i) {
-              if (start_week_ind == week_off-i && end_week_ind == week_off-i) mess += STARTEND_SYMBOL;
-              else if (start_week_ind == week_off-i) mess += START_SYMBOL;
+            if (local_diapason.start == week_off-i || local_diapason.end == week_off-i) {
+              if (local_diapason.start == week_off-i && local_diapason.end == week_off-i) mess += STARTEND_SYMBOL;
+              else if (local_diapason.start == week_off-i) mess += START_SYMBOL;
               else mess += END_SYMBOL;
               mess += " --- ";
             }
@@ -1169,10 +1214,10 @@ class Menu {
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
 
-            if (start_week_ind == week_off-i || end_week_ind == week_off-i) {
+            if (local_diapason.start == week_off-i || local_diapason.end == week_off-i) {
               mess += " --- ";
-              if (start_week_ind == week_off-i && end_week_ind == week_off-i) mess += STARTEND_SYMBOL;
-              else if (start_week_ind == week_off-i) mess += START_SYMBOL;
+              if (local_diapason.start == week_off-i && local_diapason.end == week_off-i) mess += STARTEND_SYMBOL;
+              else if (local_diapason.start == week_off-i) mess += START_SYMBOL;
               else mess += END_SYMBOL;
             }
 
@@ -1191,7 +1236,7 @@ class Menu {
           if (!count.mode)  mess += "УП\t";
           else mess += "неУП\t";
 
-          if (start_week_ind == week_off && end_week_ind == 1)  mess += "Всего";
+          if (local_diapason.start == week_off && local_diapason.end == 1)  mess += "Всего";
           else mess += "В диапазоне";
 
           if (count.mode == 2)  {
@@ -1209,6 +1254,39 @@ class Menu {
         bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
       }
     }
+
+    void stat_page(byte stat_depth) {               // "фронтенд" страниц подменю "Статистика"
+      String mess = "";
+      switch (stat_depth) {
+        case 0: {
+          mess = "Здесь пока ничего нет!\nНо мы работаем над этим!\nНа главную";
+          break;
+        }
+      }
+
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
+        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
+      }
+    }
+
+    void settings_page(byte sett_depth) {           // "фронтенд" страниц подменю "Настройки"
+      String mess = "";
+      switch (sett_depth) {
+        case 0: {
+          mess += "Сроки промежуточной аттестации\nНа главную";
+          break;
+        }
+
+        case 1: {
+          
+        }
+      }
+
+      for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
+        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
+      }
+    }
+
 } menu;
 
 void setup() {
