@@ -15,13 +15,16 @@ float Version = 0.5;                                                            
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
-  byte week_off = 3;                                             // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!)
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщеня в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
 
-} file_data;    // ПРИ СМЕНЕ ДАННЫХ РЕДАКТИРУЙ WEEK_OFF ДЛЯ ИЗБЕЖАНИЯ ПЕРЕЗАПИСЫВАНИЯ НЕДЕЛЬ!!!!!!!!
+} file_data;
 
 FileData settings_file(&FFat, "/data.dat", 'Z', &file_data, sizeof(file_data));
+
+// номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
+byte week_off = 1;                                                // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
+FileData week_file(&FFat, "/weekdata.dat", 'V', &week_off, sizeof(week_off));
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -269,17 +272,17 @@ class Sheet {
 
       for (byte i = 0; i < 4; i++) {
         String get_cell = "", range = "", returned_string;
-        byte parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей четности соответственно
-        if (i > 1) parity_offset = 2;
+        uint8_t parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей четности соответственно
+        if (i > 1) parity_offset = (week_off == 1) ? 0 : 2;
 
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
+        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
         returned_string = this->getCells(range);
         Text answer(returned_string);
         Text ans = answer.getSub(r_count, "\"");
@@ -340,7 +343,7 @@ class Sheet {
         if (i % 2 == 0) range += Sheet1;
         else range += Sheet2;
         range += less_num_c;
-        range += (less_num_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
         range += ":";
 
         byte len = 0;
@@ -354,7 +357,7 @@ class Sheet {
         }
 
         range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset[i % 2]*(file_data.week_off-parity_offset)));
+        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
         returned_string = this->getCells(range);
         Text answa(returned_string);
 
@@ -436,7 +439,7 @@ class Sheet {
       valueRange.clear();
     }
 
-    void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
+    void Counting(byte start_week = 1, byte end_week = week_off) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
       String formula = "", diapason;                                                  // строки для сборки формулы и диапазона
       byte table_len[2] = {};                                                         // горизонтальная длина таблицы
 
@@ -855,8 +858,8 @@ class Menu {
             // здесь надо суметь вычислить индекс в глобальном пространстве индексов недель [1; week_off] и засунуть его в unknown_ind
             // здесь имеем comm = ~ "с 23.03 по 30.03"
 
-            if (comm.indexOf("Эта неделя") != -1) unknown_ind = file_data.week_off;
-            else if (comm.indexOf("Предыдущая") != -1)  unknown_ind = file_data.week_off-1;
+            if (comm.indexOf("Эта неделя") != -1) unknown_ind = week_off;
+            else if (comm.indexOf("Предыдущая") != -1)  unknown_ind = week_off-1;
 
             else {
               int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
@@ -871,9 +874,9 @@ class Menu {
               startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
 
               bool found = false;
-              for (byte i = 0; i < file_data.week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
+              for (byte i = 0; i < week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
                 if (startDate.day == week[0]->pon_date.day && startDate.month == week[0]->pon_date.month)  {
-                  unknown_ind = file_data.week_off-i;
+                  unknown_ind = week_off-i;
                   found = true;
                   break;
                 }
@@ -1115,7 +1118,7 @@ class Menu {
           mess += "\n";
           mess += "Общее УП\tОбщее неУП\tПо предметам (неУП)\n";
           mess += "Назад\tНа главную";
-          start_week_ind = file_data.week_off;
+          start_week_ind = week_off;
           end_week_ind = 1;
         break;
 
@@ -1135,11 +1138,11 @@ class Menu {
           Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
           sumDate(&date_end, 6);
 
-          for (byte i = 0; i < file_data.week_off; i++) {
+          for (byte i = 0; i < week_off; i++) {
             
-            if (start_week_ind == file_data.week_off-i || end_week_ind == file_data.week_off-i) {
-              if (start_week_ind == file_data.week_off-i && end_week_ind == file_data.week_off-i) mess += STARTEND_SYMBOL;
-              else if (start_week_ind == file_data.week_off-i) mess += START_SYMBOL;
+            if (start_week_ind == week_off-i || end_week_ind == week_off-i) {
+              if (start_week_ind == week_off-i && end_week_ind == week_off-i) mess += STARTEND_SYMBOL;
+              else if (start_week_ind == week_off-i) mess += START_SYMBOL;
               else mess += END_SYMBOL;
               mess += " --- ";
             }
@@ -1166,14 +1169,14 @@ class Menu {
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
 
-            if (start_week_ind == file_data.week_off-i || end_week_ind == file_data.week_off-i) {
+            if (start_week_ind == week_off-i || end_week_ind == week_off-i) {
               mess += " --- ";
-              if (start_week_ind == file_data.week_off-i && end_week_ind == file_data.week_off-i) mess += STARTEND_SYMBOL;
-              else if (start_week_ind == file_data.week_off-i) mess += START_SYMBOL;
+              if (start_week_ind == week_off-i && end_week_ind == week_off-i) mess += STARTEND_SYMBOL;
+              else if (start_week_ind == week_off-i) mess += START_SYMBOL;
               else mess += END_SYMBOL;
             }
 
-            if (i != file_data.week_off-1) mess += "\n";
+            if (i != week_off-1) mess += "\n";
           }
           break;
         }
@@ -1188,7 +1191,7 @@ class Menu {
           if (!count.mode)  mess += "УП\t";
           else mess += "неУП\t";
 
-          if (start_week_ind == file_data.week_off && end_week_ind == 1)  mess += "Всего";
+          if (start_week_ind == week_off && end_week_ind == 1)  mess += "Всего";
           else mess += "В диапазоне";
 
           if (count.mode == 2)  {
@@ -1214,26 +1217,39 @@ void setup() {
   bot.attach(newMsg);                                                           // подключаем обработчик входящих сообщений
   bot.setPeriod(50);                                                            // период между проверками входящих сообщений
 
-  if (!FFat.begin()) {                                                          // подключаем файловую систему
-    bot.sendMessage(F("Ошибка инициализации файловой системы!"), error_chat);
-  }
-  settings_file.addWithoutWipe(true);
-  FDstat_t file_stat = settings_file.read();                                    // читаем структуру из файла
-
-  switch (file_stat) {
-    case FD_FS_ERR: bot.sendMessage(F("FileSystemError!"), error_chat);
-      break;
-    case FD_FILE_ERR: bot.sendMessage(F("OpenFileError!"), error_chat);
-      break;
-    default:
-      break;
-  }
-
-  bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
   ArduinoOTA.setHostname(OTA_NAME);                                           //имя для точки OTA обновления
   ArduinoOTA.setPassword(OTA_PASS);                                           //пароль
   ArduinoOTA.begin();
 
+
+  if (!FFat.begin()) {                                                          // подключаем файловую систему
+    bot.sendMessage(F("Ошибка инициализации файловой системы!"), error_chat);
+  }
+  settings_file.addWithoutWipe(true);
+  FDstat_t file_stat;
+
+  for (byte files = 0; files < 2; files++) {
+    if (files)  file_stat = settings_file.read();
+    else file_stat = week_file.read();
+
+    switch (file_stat) {
+      case FD_FS_ERR: bot.sendMessage(F("FileSystemError!"), error_chat);
+        break;
+      case FD_FILE_ERR: bot.sendMessage("OpenFileError: " + String((!files) ? "week_file!" : "settings_file!"), error_chat);
+        break;
+      default:
+        break;
+    }
+  }
+
+  if (week_off < 1) {
+    bot.sendMessage("Переменная week_off в структуре file_data должная иметь значение > 1!\nИзмените параметр, прежде чем продолжить работу!", error_chat);
+    for (;;) {
+      ArduinoOTA.handle();
+    }
+  }
+
+  bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
   for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе самым изощренным способом
 
   menu.start_page(0, file_stat);       //чисто для обновления структуры FB_Time
@@ -1248,6 +1264,7 @@ void loop() {
 
   bot.tick();
   settings_file.tick();
+  week_file.tick();
   timer.tick();
   serviceMess.tick();
   ArduinoOTA.handle();
