@@ -249,7 +249,6 @@ class Sheet {
 
   public:
     void begin() {                                  // is_start обозначает, вызывается ли эта функция в начала работы программы или после очередной проверки актульность недели во время работы
-      
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
       GSheet.setPrerefreshSeconds(10 * 60);
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
@@ -440,9 +439,9 @@ class Sheet {
     void Counting(byte start_week = 1, byte end_week = file_data.week_off) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
       String formula = "", diapason;                                                  // строки для сборки формулы и диапазона
       byte table_len[2] = {};                                                         // горизонтальная длина таблицы
-      bool prev = false;
 
-      for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {                    // Высчитываем len (горизонталную длины недели в таблице)
+      for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {                    // Высчитываем len (горизонталную длины недели в таблице) для обоих четностей недель у count.subgroup
+        bool prev = false;
         for (int s = 0; s < 7; s++) {
           if (week[count.subgroup + 2*parity_iter]->subj_num[s] == 0) continue;
           if (prev) table_len[parity_iter] += 1;
@@ -450,6 +449,14 @@ class Sheet {
           prev = true;
         }
       }
+
+      /*
+      for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
+        if (week[i+2*z]->subj_num[s] == 0) continue;
+        if (prev) tableLen[z] += 1;
+        tableLen[z] += week[i+2*z]->subj_num[s];
+        prev = true;
+      }*/
       
       // == Находим позицию вставки формулы в листе === (В данной версии пока так же одинаокова для любого варианта подсчета)
       String form_position = (!count.subgroup) ? Sheet1 : Sheet2;
@@ -812,22 +819,24 @@ class Menu {
         }
 
         if (way == "021") {
-          if (comm == "Общее УП") count.mode = 0;
-          else if (comm == "Общее неУП") count.mode = 1;
-          else if (comm == "По предметам (неУП)") {
-            count.mode = 2;
-            way = "0211";
-            calculate_page(2);
-            return;
-          }
-          calculate_page(3);
-          way = "0212";
-
           if (ret_command)  {
             ret_command = false;
             calculate_page(1);
           }
+          
+          else {
+            if (comm == "Общее УП") count.mode = 0;
+            else if (comm == "Общее неУП") count.mode = 1;
+            else if (comm == "По предметам (неУП)") {
+              count.mode = 2;
+              way = "0211";
+              calculate_page(2);
+              return;
+            }
 
+            calculate_page(3);
+            way = "0212";
+          }
           return;
         }
 
@@ -1183,7 +1192,7 @@ class Menu {
           else mess += "В диапазоне";
 
           if (count.mode == 2)  {
-            mess += "\n";
+            mess += "\nПредмет: ";
             mess += count.subject;
           }
 
