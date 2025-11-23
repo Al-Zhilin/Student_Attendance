@@ -6,17 +6,22 @@
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
 #include <ArduinoOTA.h>
-#include "types.h"
 #include <settings.h>
+#include "types.h"
 
 FastBot bot(BOT_TOKEN);
                                                    
 float Version = 0.5;                                                                              //текущая версия прошивки
 byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
+struct week_diapason {
+  byte start = 0;
+  byte end = 0;
+}; 
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщения в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
+  week_diapason att_diapason;                                     // диапазон недель промежуточной аттестации
 
 } file_data;
 
@@ -107,6 +112,8 @@ struct WeekInfo {
 
 WeekInfo *week[4] = {&week_object[0], &week_object[1], &week_object[2], &week_object[3]};           //week[4] - массив указателей на обьекты структуры WeekInfo. 0 и 1 - для настоящей четности, а 2 и 3 - для противоположной у обоих подгрупп
 
+byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors = SURNAME_ERRORS_NUM);
+
 struct CountInfo {
   String surn;
   int surn_ind;
@@ -127,8 +134,6 @@ void checkYear() {
   }
   else day_month[1] = 28;
 }
-
-byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors = SURNAME_ERRORS_NUM);
 
 struct timer_data {
   uint32_t start_millis = 0;
@@ -573,12 +578,7 @@ class Menu {
     const String s_menu[4] = {"Редактировать", "Подсчитать", "Статистика", "Настройки"};
     String way = "0";
     byte unknown_ind = 0;
-    struct week_diapason {
-      byte start = 0;
-      byte end = 0;
-    }; 
-    week_diapason local_diapason;         // локально для изменения в менюшках, для адаптивности в подсчете и перед утверждением в настройках границ промежуточной аттестации
-    week_diapason total_diapason;         // глобально для настроек диапазона по умолчанию
+    week_diapason local_diapason;         // границы недель диапазона подсчета
 
   public:
     void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {        // функция показа стартовой страницы
@@ -965,7 +965,7 @@ class Menu {
           }
 
           else if (comm == "Сроки промежуточной аттестации") {
-            calculate_page(3);          // по факту здесь отлично подходит уже готовая функция отображения списка недель
+            settings_page(1);
             way = "0411";
             return;
           }
@@ -1273,12 +1273,62 @@ class Menu {
       String mess = "";
       switch (sett_depth) {
         case 0: {
-          mess += "Сроки промежуточной аттестации\nНа главную";
+          mess = "Сроки промежуточной аттестации\nНа главную";
           break;
         }
 
         case 1: {
-          
+          mess = "Нажмите для обожначения границ:\nНазад\tГотово\tНа главную\n";
+          week_diapason centre;
+          centre.start = (!file_data.att_diapason.start) ? week_off+2 : file_data.att_diapason.start;
+          centre.end = (!file_data.att_diapason.end) ? week_off-2 : file_data.att_diapason.end;
+
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          sumDate(&date_end, 6);
+
+          // нужно подвинуть даты начала и конца недели до валидных значений (до недели начала промежутки (или до текущей недели) - минус 4 недели (или меньше) назад, именно с таких дат начинаем список)
+          byte prev_weeks = ((week_off > 4) ? 4 : week_off-1);
+
+          sumDate(&date_start, 7 * (centre.start - week_off + prev_weeks));
+          sumDate(&date_end, 7 * (centre.start - week_off + prev_weeks));
+
+
+          for (byte i = 0; i < 5 + prev_weeks + abs(centre.start - centre.end); i++) {         // отображаем 4 недели до, 4 после, и все недели, входящие в промежутку. Иначе - то же самое, но вместо недель промежутки - актуальная неделя
+            
+            if (centre.start == week_off - i + prev_weeks || centre.end == week_off - i + prev_weeks) {     // если надо - в начале ячейки недели ставим спецсимвол
+              if (centre.start == week_off - i + prev_weeks && centre.end == week_off - i + prev_weeks) mess += STARTEND_SYMBOL;
+              else if (centre.start == week_off - i + prev_weeks) mess += START_SYMBOL;
+              else mess += END_SYMBOL;
+              mess += " --- ";
+            }
+
+            mess += "с ";
+            if (date_start.day < 10) mess += "0";
+            mess += date_start.day;
+            mess += ".";
+            if (date_start.month < 10) mess += "0";
+            mess += date_start.month;
+            mess += " по ";
+            if (date_end.day < 10) mess += "0"; 
+            mess += date_end.day;
+            mess += ".";
+            if (date_end.month < 10) mess += "0";
+            mess += date_end.month;
+
+            sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
+            sumDate(&date_end, -7);
+
+            if (centre.start == week_off - i + prev_weeks || centre.end == week_off - i + prev_weeks) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
+              mess += " --- ";
+              if (centre.start == week_off - i + prev_weeks && centre.end == week_off - i + prev_weeks) mess += STARTEND_SYMBOL;
+              else if (centre.start == week_off - i + prev_weeks) mess += START_SYMBOL;
+              else mess += END_SYMBOL;
+            }
+
+            if (i != 4 + prev_weeks + abs(centre.start - centre.end))  mess += "\n";
+          }
+
+          break;
         }
       }
 
