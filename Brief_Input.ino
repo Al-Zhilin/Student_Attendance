@@ -30,6 +30,8 @@ void briefInput(Text message, String chat) {
     if (input_found)  break;
   }
 
+  //bot.sendMessage(String(presence_mode) + "/" + String(input_found), error_chat);
+
   //if (input_found == 2 && !isDigit((message.getSub(presence_mode, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
 
   if (!input_found) return;                               //если не нашли никакого ввода - выходим сразу, тут больше нечего ловить
@@ -38,8 +40,9 @@ void briefInput(Text message, String chat) {
   timer.add(bot.lastUsrMsg(), 15, chat);
 
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
-    String condition = message.getSub(presence_mode, "\n").toString(), symbol = "";
+    String condition = message.getSub(0, "\n").toString(), symbol = "";
     condition.trim();                                          //убираем лишние пробелы
+    bot.sendMessage(condition, error_chat);
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
     for (int i = 0; i < condition.length(); /*этот пункт прописан отдельно дальше*/) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста
@@ -112,7 +115,7 @@ void briefInput(Text message, String chat) {
     }
 
     else if (faza == 1) {
-      serviceMess.edit("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!");
+      serviceMess.edit("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!", 7000);
       return;
     }
 
