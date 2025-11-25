@@ -42,7 +42,6 @@ void briefInput(Text message, String chat) {
   if (input_found == 2) {                                      //рассматриваем условие при сокращенном вводе
     String condition = message.getSub(0, "\n").toString(), symbol = "";
     condition.trim();                                          //убираем лишние пробелы
-    bot.sendMessage(condition, error_chat);
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
     for (int i = 0; i < condition.length(); /*этот пункт прописан отдельно дальше*/) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста
@@ -131,11 +130,11 @@ void briefInput(Text message, String chat) {
     for (byte i = 0; i < (sizeof(lessons)/sizeof(lessons[0])); i++) {
       Time support_time(0, MINUTES_OFFSET);
       if (now_time >= (lessons[i].start - support_time) && now_time <= (lessons[i].end + support_time)) {
-        found_less[lessons_found++] = i+1;
+        found_less[lessons_found] = i+1;
         break;
       }
     }
-    if (!found_less[lessons_found]) {
+    if (!found_less[lessons_found++]) {                                     // инкрементируем здесь, чтобы корректно проверить
       serviceMess.edit("Убедитесь в корректности текущей пары!", 5000);
       return;
     }
