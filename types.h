@@ -34,6 +34,7 @@ public:
 class MemoryControl {
   private:
     uint32_t _start_heap = 0;
+    uint32_t _keep_heap = 0;
 
   public:
     MemoryControl();

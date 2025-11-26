@@ -97,10 +97,11 @@ void briefInput(Text message, String chat) {
 
     if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
       if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
-        if (condition.endsWith("позавчера"))  found_day = real_time.day-2;              //Важно! Сначала проверяем это
-        else if (condition.endsWith("вчера")) found_day = real_time.day-1;              //только потом это, не наоборот! (да, я здесь накосячил по глупости изначально)
-        else if (condition.endsWith("сегодня")) found_day = real_time.day;
-        found_month = real_time.month;
+        Date today(real_time.day, real_time.month);
+        if (condition.endsWith("позавчера"))  sumDate(&today, -2);              //Важно! Сначала проверяем это
+        else if (condition.endsWith("вчера")) sumDate(&today, -1);              //только потом это, не наоборот! (да, я здесь накосячил по глупости изначально)
+        found_day = today.day;
+        found_month = today.month;
       }
 
       else {                                                                        //не имеет на конце специальных слов
@@ -140,6 +141,8 @@ void briefInput(Text message, String chat) {
     }
   }
 
+  serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nПолучаю данные из таблицы...");
+
   //будем хранить будущие обьекты для запроса для обеих подгрупп
   //[подгруппа][массив Нок для каждой пары, которые уже были выставлены в Таблице]
   FirebaseJson nki_array[2][lessons_found];
@@ -167,12 +170,11 @@ void briefInput(Text message, String chat) {
       }
       if (!valid_less) {
         // убираем выставление Нок для всех пар (хз, мб нужно прерывать выставление ТОЛЬКО для этой пары, но я считаю, что при таком случае пользователь скорее всего ошибся днем и лучше его вовсе остановить)
-        bot.sendMessage("В данный день у " + String(i+1) + " подгруппы нет пары под номером " + String(found_less[less]) + "!\nПересмотрите сокращенный ввода заново!", chat);
+        serviceMess.edit("В данный день у " + String(i+1) + " подгруппы нет пары под номером " + String(found_less[less]) + "!\nПересмотрите сокращенный ввода заново!", 7000);
+        for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
         return;
       }
     }
-
-    serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nПолучаю данные из таблицы...");
 
     for (byte less = 0; less < lessons_found; less++) {
       String range = ((!i) ? Sheet1 : Sheet2);
@@ -184,7 +186,7 @@ void briefInput(Text message, String chat) {
 
       tries = 0;
       while (!GSheet.values.get(&nki_array[i][less], spreadsheetId, range) && tries < GetTryNum) tries++;
-      if (tries == SetTryNum) bot.sendMessage("ErrorGetRequest!", chat);
+      if (tries == SetTryNum) bot.sendMessage(F("ErrorGetRequest! (Получение существующий пропусков из Sheet)"), chat);
     
       for (byte j = 0; j < people_in_subgr[i]; j++) {
         String address = "values/[";
@@ -194,6 +196,12 @@ void briefInput(Text message, String chat) {
           if (!presence_mode) nki_array[i][less].set(address, "");
           else nki_array[i][less].set(address, "D");
         }
+      }
+
+      if (!MemControl.check()) {
+        serviceMess.edit(F("Нехватка RAM! (Этап формирование массивов)"), 7000);
+        for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
+        return;
       }
     }
   }
@@ -208,12 +216,12 @@ void briefInput(Text message, String chat) {
     bool surname_found = false;
     byte min_syntax_errors = 250;
     person assumed_people;                                                      //если фамилия с опечаткой - здесь будем хранить человека, наиболее подходящего
-    byte assumed_length = 0;
+    byte assumed_length = 0; 
     String address = "values/[";
 
     for (int ind = 0; ind < sizeof(students)/sizeof(students[0]); ind++) {      //цикл перебирает все фамилии по списку и сравнивает с введенной
       syntax_errors = 0;
-      byte func_res = CheckSurnameMatch(dataa.toString(), students[ind].surname, &syntax_errors);
+      byte func_res = CheckSurnameMatch(dataa.toString(), students[ind].surname, &syntax_errors);    // 1 - безошибочно, 2 - с допустимым кол-вом ошибок
 
       if (func_res == 1) {       //если фамилия безошибочно найдена в списке фамилий
         //------------------Здесь ставим Нку нужному человеку-----------------------------
@@ -233,9 +241,11 @@ void briefInput(Text message, String chat) {
       if (func_res == 2 && syntax_errors <= min_syntax_errors) {
         if (syntax_errors == min_syntax_errors) {
           bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString(), chat);
-          timer.add(bot.lastBotMsg(), 10, error_chat);
+          bot.sendMessage(students[ind].surname, error_chat);
+          timer.add(bot.lastBotMsg(), 10, chat);
           break;
         }
+
         min_syntax_errors = syntax_errors;
         assumed_people.surname = students[ind].surname;
         assumed_people.subgroup = students[ind].subgroup;
@@ -252,8 +262,8 @@ void briefInput(Text message, String chat) {
         address += "]/[0]";
 
         for (byte less = 0; less < lessons_found; less++) {
-          nki_array[students[ind].subgroup][less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[students[ind].subgroup][less], address, true)));
-          need_post[students[ind].subgroup] = true;
+          nki_array[assumed_people.subgroup][less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[assumed_people.subgroup][less], address, true)));
+          need_post[assumed_people.subgroup] = true;
         }
 
         surname_found = true;
@@ -262,9 +272,16 @@ void briefInput(Text message, String chat) {
 
       surname_length[students[ind].subgroup]++;         //см. описание к переменной выше
     }
+
     if (!surname_found) {
       bot.sendMessage("Неизвестная фамилия: " + String(dataa) + "!", chat);
       timer.add(bot.lastBotMsg(), 10, chat);
+    }
+
+    if (!MemControl.check()) {
+        serviceMess.edit(F("Нехватка RAM! (Заполнение массивов пропусками)"), 7000);
+        for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
+        return;
     }
   }
 
@@ -291,7 +308,7 @@ void briefInput(Text message, String chat) {
         tries++;
       }
       nki_array[i][less].clear();
-      if (tries == SetTryNum) bot.sendMessage("ErrorSendRequest!", chat);
+      if (tries == SetTryNum) bot.sendMessage(F("ErrorSendRequest! (Отправка пропусков в Sheet)"), chat);
     }
   }
 
@@ -307,7 +324,7 @@ String UpdateArrayCell(byte presence_m, String post_symbol, String old_nka) {
     if (post_symbol == "неуп" || post_symbol == "неУп" || post_symbol == "неУП")  return DISREP_SYMBOL;
     if (post_symbol == "тут" || post_symbol == "Тут" || post_symbol == "ТУТ") return PRESENCE_SYMBOL;
     else {
-      bot.sendMessage(F("Некорректный post_symbol обнаружен в сокращенном вводе!\nСделаем вид, что его вообще не было"), error_chat);
+      bot.sendMessage("Некорректный post_symbol обнаружен в сокращенном вводе!\nСделаем вид, что его вообще не было: \"" + String(post_symbol) + "\"", error_chat);
       return DISREP_SYMBOL;
     }
   }
@@ -317,7 +334,7 @@ String UpdateArrayCell(byte presence_m, String post_symbol, String old_nka) {
 String getJsonData (FirebaseJson &object, String &addr, bool show_error) {
   FirebaseJsonData data;
   if (object.get(data, addr)) return data.stringValue;
-  if (show_error) bot.sendMessage("invalidPath", error_chat);
+  if (show_error) bot.sendMessage(F("invalidPath! Тщательно проверьте результат работы последнего действия!"), error_chat);
   return "invalidPath";
 }
 

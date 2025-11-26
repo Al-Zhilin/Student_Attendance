@@ -85,16 +85,18 @@ bool Time::operator !=(const Time &other) const {
 
 MemoryControl::MemoryControl() {
     _start_heap = ESP.getFreeHeap();
+    _keep_heap = 0;
 }
 
 bool MemoryControl::check() {                    // проверяем свободное количество
+    _keep_heap = max(_keep_heap, ESP.getFreeHeap());            // и обновляем максимальное занимаемой пространство памяти
     if (ESP.getFreeHeap() < MIN_FREE_HEAP * 1024)  return false;
     return true;
 }
 
 uint32_t MemoryControl::getHeap(bool mode) {     // false - start_heap; true - current heap
     if (!mode) return _start_heap;
-    return ESP.getFreeHeap();
+    return _keep_heap;
 }
 
 uint32_t MemoryControl::totalHeap() {            // общий размер памяти

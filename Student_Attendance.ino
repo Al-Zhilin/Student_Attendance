@@ -1384,11 +1384,14 @@ void setup() {
   list.begin();
   menu.start_page(1, file_stat);       //вот тут уже отсылаем менюшку
   checkYear();              //проверяем год на високосность
+  bot.sendMessage("Запускаюсь!!", error_chat);
 }
 
 void loop() {
   static int old_year = 0;
   static byte old_day = 0;
+  static uint32_t heap_timeout = millis();
+  MemoryControl MemControl;
 
   bot.tick();
   settings_file.tick();
@@ -1408,6 +1411,11 @@ void loop() {
   else if (old_day != t.day) {                        //если сменился день - повод проверить актуальность недели
     checkTableWeek();
     old_day = t.day;
+  }
+
+  if (millis() - heap_timeout >= HEAP_CHECK_TIMEOUT) {
+    heap_timeout = millis();
+    if (!MemControl.check())  bot.sendMessage(F("Объем оперативной памяти критически мал! (main)"), error_chat);
   }
 
 }
