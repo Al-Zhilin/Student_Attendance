@@ -1294,10 +1294,10 @@ class Menu {
 
 
           for (byte i = 0; i < 5 + prev_weeks + abs(centre.start - centre.end); i++) {         // отображаем 4 недели до, 4 после, и все недели, входящие в промежутку. Иначе - то же самое, но вместо недель промежутки - актуальная неделя
-            
-            if (centre.start == week_off - i + prev_weeks || centre.end == week_off - i + prev_weeks) {     // если надо - в начале ячейки недели ставим спецсимвол
-              if (centre.start == week_off - i + prev_weeks && centre.end == week_off - i + prev_weeks) mess += STARTEND_SYMBOL;
-              else if (centre.start == week_off - i + prev_weeks) mess += START_SYMBOL;
+            byte start_offset = week_off - i + prev_weeks + (centre.start - centre.end)/2;
+            if (centre.start == start_offset || centre.end == start_offset) {     // если надо - в начале ячейки недели ставим спецсимвол
+              if (centre.start == start_offset && centre.end == start_offset) mess += STARTEND_SYMBOL;
+              else if (centre.start == start_offset) mess += START_SYMBOL;
               else mess += END_SYMBOL;
               mess += " --- ";
             }
@@ -1318,10 +1318,10 @@ class Menu {
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
 
-            if (centre.start == week_off - i + prev_weeks || centre.end == week_off - i + prev_weeks) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
+            if (centre.start == start_offset || centre.end == start_offset) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
               mess += " --- ";
-              if (centre.start == week_off - i + prev_weeks && centre.end == week_off - i + prev_weeks) mess += STARTEND_SYMBOL;
-              else if (centre.start == week_off - i + prev_weeks) mess += START_SYMBOL;
+              if (centre.start == start_offset && centre.end == start_offset) mess += STARTEND_SYMBOL;
+              else if (centre.start == start_offset) mess += START_SYMBOL;
               else mess += END_SYMBOL;
             }
 

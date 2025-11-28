@@ -39,8 +39,8 @@ class MemoryControl {
   public:
     MemoryControl();
     bool check();
-    uint32_t getHeap(bool mode);
-    uint32_t totalHeap();
+    uint32_t getDiff();
+    void resetKeep();
 };
 
 #endif

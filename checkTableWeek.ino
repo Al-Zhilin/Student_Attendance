@@ -91,6 +91,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
     for (byte iter = ((week_off == 1) ? 1 : 0); iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель. Учитывает, что первые 2 недели в таблице всегда построены
 
+      MemControl.resetKeep();
+
       FirebaseJsonArray requests;     //массив запросов
       FirebaseJson request;         //храним по очереди все запросы перед добавлением в массив запросовE
 
@@ -221,7 +223,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
       //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
 
 
-      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String((MemControl.getHeap(false) - MemControl.getHeap(true))/1024) + " кБ в RAM\nВсего - " + String(MemControl.totalHeap()/1024) + " кБ, Свободно - " + String(MemControl.getHeap(true)/1024) + " кБ");
+      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String(MemControl.getDiff()/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
 
       FirebaseJson response;
       bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");

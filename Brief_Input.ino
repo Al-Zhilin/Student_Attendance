@@ -312,7 +312,7 @@ void briefInput(Text message, String chat) {
     }
   }
 
-  serviceMess.edit("Сокращенный ввод обработан!\nRAM занято: " + String((MemControl.getHeap(false)-MemControl.getHeap(true))/1024) + " кБ.", 5000);
+  serviceMess.edit("Сокращенный ввод обработан!\nRAM занято: " + String(MemControl.getDiff()/1024) + " кБ.", 5000);
 }
 
 String UpdateArrayCell(byte presence_m, String post_symbol, String old_nka) {

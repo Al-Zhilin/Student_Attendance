@@ -1,5 +1,5 @@
 #include "types.h"  // Заголовок, где объявлен класс Time
-#define MIN_FREE_HEAP 50                                                                       //минимальный объем свободной оперативной памяти во время выполнения программы (порог нужен для оценки при мониторинге), кБ
+#define MIN_FREE_HEAP 50                                                                         //минимальный объем свободной оперативной памяти во время выполнения программы (порог нужен для оценки при мониторинге), кБ
 
 // Конструкторы
 Time::Time(byte h, byte m) : hours(h), minutes(m) {}
@@ -85,20 +85,21 @@ bool Time::operator !=(const Time &other) const {
 
 MemoryControl::MemoryControl() {
     _start_heap = ESP.getFreeHeap();
-    _keep_heap = 0;
+    _keep_heap = ESP.getFreeHeap();
 }
 
 bool MemoryControl::check() {                    // проверяем свободное количество
-    _keep_heap = max(_keep_heap, ESP.getFreeHeap());            // и обновляем максимальное занимаемой пространство памяти
+    _keep_heap = min(_keep_heap, ESP.getFreeHeap());            // и обновляем минимальный обьем свободной памяти
     if (ESP.getFreeHeap() < MIN_FREE_HEAP * 1024)  return false;
     return true;
 }
 
-uint32_t MemoryControl::getHeap(bool mode) {     // false - start_heap; true - current heap
-    if (!mode) return _start_heap;
-    return _keep_heap;
+void MemoryControl::resetKeep() {      // сбрасывает сохраненное начальное значение RAM, нужно в некоторых случаях
+    _start_heap = ESP.getFreeHeap();
 }
 
-uint32_t MemoryControl::totalHeap() {            // общий размер памяти
-    return ESP.getHeapSize();
+uint32_t MemoryControl::getDiff() {
+    if (_keep_heap >= _start_heap)  return 0;             // по идее может и такое быть
+    return _start_heap - _keep_heap;
 }
+
