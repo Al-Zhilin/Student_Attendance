@@ -251,6 +251,7 @@ class ServiceMess {
 
 } serviceMess;
 
+FB_Time realTime;                            //структура реального времени
 
 class Sheet {
   private:
@@ -582,7 +583,7 @@ class Menu {
 
   public:
     void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {        // функция показа стартовой страницы
-      // file_status отображает статус работы с файлом настроек, нужен для понимания - отправлять или подтягивать сообщения у пользователей
+      // file_status отображает статус работы с файлом настроек, нужен (в данной функции) для понимания - отправлять или подтягивать сообщения у пользователей
       way.reserve(7);
 
       bot.notify(false);
@@ -610,7 +611,7 @@ class Menu {
       settings_file.update();
     }
 
-    void menuEdit (String comm, String user) {        // обработка нажатий в меню
+    void menuEdit(String comm, String user) {        // обработка нажатий в меню
       FB_Time t = bot.getTime(3);
       static bool N_edited = false;
 
@@ -976,6 +977,56 @@ class Menu {
             ret_command = false;
             calculate_page(3);
           }
+          
+          else {
+            int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
+
+            if (c_index == -1)   {                                                // на прям крайняк
+              bot.sendMessage(F("invalidMenuTextInCount!"), user);
+              return;
+            }
+
+            Date parsedDate;
+            parsedDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0') + (realTime.dayWeek-1);         // не только парсим день, но еще и сравниваем его по дню недели с текущим днем недели, упрощает расчеты ввиду получения кратности разницы
+            parsedDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+            byte week_diff = 0;
+
+            
+            int days_between;
+
+            if (parsedDate.month <= realTime.month) {                             // если выбранная неделя в этом, или в одном из прошлый месяцев
+              days_between = day_month[parsedDate.month - 1] - parsedDate.day;
+
+              for (byte i = parsedDate.month; i < realTime.month - 1; i++) {
+                days_between += day_month[i];
+              }
+
+              days_between += realTime.day;
+
+            }
+            
+            else {                                                               // если выбранная неделя в будущем месяце (месяцах)
+              days_between = day_month[realTime.month - 1] - realTime.day;
+
+              for (byte i = realTime.month; i < parsedDate.month - 1; i++) {
+                days_between += day_month[i];
+              }
+
+              days_between += parsedDate.day;
+              days_between = -days_between;
+            }
+
+            if (abs(days_between) % 7 != 0)  {
+              bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель!\nКритично!"), error_chat);
+              bot.sendMessage(String(days_between), error_chat);
+              return;
+            }
+            
+            unknown_ind = week_off - days_between;
+
+            bot.sendMessage(String(unknown_ind) + "/" + String(week_off), error_chat);
+            
+          }
         }
       }
     }
@@ -1294,8 +1345,8 @@ class Menu {
 
 
           for (byte i = 0; i < 5 + prev_weeks + abs(centre.start - centre.end); i++) {         // отображаем 4 недели до, 4 после, и все недели, входящие в промежутку. Иначе - то же самое, но вместо недель промежутки - актуальная неделя
-            byte start_offset = week_off - i + prev_weeks + (centre.start - centre.end)/2;
-            if (centre.start == start_offset || centre.end == start_offset) {     // если надо - в начале ячейки недели ставим спецсимвол
+            byte start_offset = week_off - i + prev_weeks + ((centre.start - centre.end > 1) ? centre.start - centre.end+1: centre.start - centre.end)/2;
+            if (file_data.att_diapason.start && (centre.start == start_offset || centre.end == start_offset)) {     // если надо - в начале ячейки недели ставим спецсимвол
               if (centre.start == start_offset && centre.end == start_offset) mess += STARTEND_SYMBOL;
               else if (centre.start == start_offset) mess += START_SYMBOL;
               else mess += END_SYMBOL;
@@ -1318,7 +1369,7 @@ class Menu {
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
 
-            if (centre.start == start_offset || centre.end == start_offset) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
+            if (file_data.att_diapason.start && (centre.start == start_offset || centre.end == start_offset)) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
               mess += " --- ";
               if (centre.start == start_offset && centre.end == start_offset) mess += STARTEND_SYMBOL;
               else if (centre.start == start_offset) mess += START_SYMBOL;
@@ -1347,8 +1398,7 @@ void setup() {
 
   ArduinoOTA.setHostname(OTA_NAME);                                           //имя для точки OTA обновления
   ArduinoOTA.setPassword(OTA_PASS);                                           //пароль
-  ArduinoOTA.begin();
-
+  ArduinoOTA.begin(); 
 
   if (!FFat.begin()) {                                                          // подключаем файловую систему
     bot.sendMessage(F("Ошибка инициализации файловой системы!"), error_chat);
@@ -1394,23 +1444,22 @@ void loop() {
   MemoryControl MemControl;
 
   bot.tick();
+  realTime = bot.getTime(3);
   settings_file.tick();
   week_file.tick();
   timer.tick();
   serviceMess.tick();
   ArduinoOTA.handle();
 
-  FB_Time t = bot.getTime(3);
-
-  if (!old_year && t.year)  old_year = t.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
-  else if (old_year != t.year)  {                     //Если год сменился - опа, произошел новый год, то проверяем на високосность
+  if (!old_year && realTime.year)  old_year = realTime.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
+  else if (old_year != realTime.year)  {                     //Если год сменился - опа, произошел новый год, то проверяем на високосность
     checkYear();
-    old_year = t.year;
+    old_year = realTime.year;
   }
-  if (!old_day && t.day)  old_day = t.day;
-  else if (old_day != t.day) {                        //если сменился день - повод проверить актуальность недели
+  if (!old_day && realTime.day)  old_day = realTime.day;
+  else if (old_day != realTime.day) {                        //если сменился день - повод проверить актуальность недели
     checkTableWeek();
-    old_day = t.day;
+    old_day = realTime.day;
   }
 
   if (millis() - heap_timeout >= HEAP_CHECK_TIMEOUT) {

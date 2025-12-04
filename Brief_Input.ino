@@ -4,7 +4,6 @@ void briefInput(Text message, String chat) {
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "", post_symbol = "", temp_dataa = "";
   byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не по стандарту
-  FB_Time real_time = bot.getTime(3);
   MemoryControl MemControl;
 
   post_symbol.reserve(10);
@@ -97,7 +96,7 @@ void briefInput(Text message, String chat) {
 
     if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
       if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
-        Date today(real_time.day, real_time.month);
+        Date today(realTime.day, realTime.month);
         if (condition.endsWith("позавчера"))  sumDate(&today, -2);              //Важно! Сначала проверяем это
         else if (condition.endsWith("вчера")) sumDate(&today, -1);              //только потом это, не наоборот! (да, я здесь накосячил по глупости изначально)
         found_day = today.day;
@@ -105,13 +104,13 @@ void briefInput(Text message, String chat) {
       }
 
       else {                                                                        //не имеет на конце специальных слов
-        found_day = real_time.day;
-        found_month = real_time.month;
+        found_day = realTime.day;
+        found_month = realTime.month;
       }
     }
 
     else if (faza == 3) {    //если указан только день - месяц воспринимаем как текущий
-      found_month = real_time.month;
+      found_month = realTime.month;
     }
 
     else if (faza == 1) {
@@ -124,9 +123,9 @@ void briefInput(Text message, String chat) {
   }
 
   else {                                 //Присваиваем данные текущего дня и пары, которая идет именно сейчас, если пользователь не указал эти данные явно (ввод без условия)
-    found_day = real_time.day;
-    found_month = real_time.month;
-    Time now_time(real_time.hour, real_time.minute);
+    found_day = realTime.day;
+    found_month = realTime.month;
+    Time now_time(realTime.hour, realTime.minute);
     
     for (byte i = 0; i < (sizeof(lessons)/sizeof(lessons[0])); i++) {
       Time support_time(0, MINUTES_OFFSET);

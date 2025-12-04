@@ -1,11 +1,11 @@
 int8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
-  FB_Time realTime = bot.getTime(3);                            //структура реального времени
 
+  realTime = bot.getTime(3);         //обновили время
   serviceMess.edit("Проверяю актуальность недели в таблице...");
 
   //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
-  if (realTime.day == 0) {
+  if (!bot.timeSynced()) {
     bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
     timer.add(bot.lastBotMsg(), 10, error_chat);
     return -1;
@@ -46,6 +46,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
     weeksToBuild = days_between / 7;
     if (days_between % 7 != 0)  {
       bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);
+      serviceMess.edit("Достроение недель прервано в связи с некоректным временем в системе!", 10000);
       return -1;
     }
   }
