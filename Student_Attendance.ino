@@ -6,13 +6,14 @@
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
 #include <ArduinoOTA.h>
+#include <ESPmDNS.h>          // в какой-то момент без этого явного включения скетч не скомпилился. Пускай будет.
 #include <settings.h>
 #include "types.h"
 
 FastBot bot(BOT_TOKEN);
                                                    
 float Version = 0.5;                                                                              //текущая версия прошивки
-byte people_in_subgr[2] = {};                                                                     //количество людей в каждой подгруппе
+
 struct week_diapason {
   byte start = 0;
   byte end = 0;
@@ -46,7 +47,7 @@ const String months[] = {               //сокращенные названи�
   "Дек",
 };
 
-byte day_month[] = {        //количество дней в каждом месяце года. Для високосного есть отдельная функция
+byte day_month[] = {        //количество дней в каждом месяце года. Для актуализации високосности есть отдельная функция
   31,
   28,
   31,
@@ -108,9 +109,9 @@ struct WeekInfo {
   byte *less_nums[7] = {};        //номера всех пар в дне
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
 
-} week_object[4];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
+} week_object[2];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
 
-WeekInfo *week[4] = {&week_object[0], &week_object[1], &week_object[2], &week_object[3]};           //week[4] - массив указателей на обьекты структуры WeekInfo. 0 и 1 - для настоящей четности, а 2 и 3 - для противоположной у обоих подгрупп
+WeekInfo *week[2] = {&week_object[0], &week_object[1]};           //week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели
 
 byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors = SURNAME_ERRORS_NUM);
 
@@ -228,7 +229,7 @@ class ServiceMess {
     uint32_t start_millis = 0;
 
   public:
-    void edit(String edit_text, uint32_t del_period = 0) {                  // перегруженная функция, запускает таймер на очистку сообщения. Можно было сделать и без перегрузки, но нэт :)
+    void edit(String edit_text, uint32_t del_period = 0) {                  // функция редактирует сервисное сообщение, а при передаче дополнительного параметра - очищает его через timeout
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + ((edit_text != "") ? "\n\n" : "") + edit_text, Admins[i]);
       }
@@ -257,7 +258,7 @@ class Sheet {
   private:
 
   public:
-    void begin() {                                  // is_start обозначает, вызывается ли эта функция в начала работы программы или после очередной проверки актульность недели во время работы
+    void begin() {
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
       GSheet.setPrerefreshSeconds(10 * 60);
       GSheet.begin(CLIENT_EMAIL, PROJECT_ID, PRIVATE_KEY);
@@ -276,19 +277,16 @@ class Sheet {
 
       serviceMess.edit("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
 
-      for (byte i = 0; i < 4; i++) {
+      for (byte i = 0; i < 2; i++) {             // парсим данные о текущей и предыдущей неделе
         String get_cell = "", range = "", returned_string;
-        uint8_t parity_offset = 1;                       //бывает 1 или 2, показывает, парсим данные из недели последней или предыдущей четности соответственно
-        if (i > 1) parity_offset = (week_off == 1) ? 0 : 2;
-
+      
         //------------Получаем краткую информацию с заглавной ячейки недели-------------
-        if (i % 2 == 0) range += Sheet1;
-        else range += Sheet2;
+        range += Sheet;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (weekInfo_i + (offset*(week_off-i)));
         range += ":";
         range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (weekInfo_i + (offset*(week_off-i)));
         returned_string = this->getCells(range);
         Text answer(returned_string);
         Text ans = answer.getSub(r_count, "\"");
@@ -297,7 +295,7 @@ class Sheet {
           ans.getSub(iter, "/").toString(get_cell);
           Text cell(get_cell);
           if (!iter)  {
-            if (cell == "числитель" || cell == "Числитель") week[i]->parity = false;
+            if (cell == WEEK_PARITY_NAME) week[i]->parity = false;
             else week[i]->parity = true;
           }
 
@@ -345,11 +343,9 @@ class Sheet {
 
 
         //-----------------------Получение номеров всех пар-----------------------------
-        range = "";
-        if (i % 2 == 0) range += Sheet1;
-        else range += Sheet2;
+        range = Sheet;
         range += less_num_c;
-        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (less_num_i + (offset*(week_off-i)));
         range += ":";
 
         byte len = 0;
@@ -363,7 +359,7 @@ class Sheet {
         }
 
         range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset[i % 2]*(week_off-parity_offset)));
+        range += (less_num_i + (offset*(week_off-i)));
         returned_string = this->getCells(range);
         Text answa(returned_string);
 
@@ -954,7 +950,103 @@ class Menu {
 
       else if (way.startsWith("03")) {                    // "бэкенд" ветки статистики
         if (way == "03") {                    // стартовая страница
+          if (comm == "Общее неУП") {
+            way = "031";
+            stat_page(1);
+          }
+        }
 
+        else if (way == "031") {
+          if (comm == "Готово") {
+            byte len[2] = {};
+            count.mode = 1;
+            bot.sendMessage("Подсчитываю пропуски...", user);
+            uint32_t mess_id = bot.lastBotMsg();
+            unsigned int max_len = 0;
+            way = "0";
+            start_page(1);
+
+            for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) max_len = max(max_len, students[i].surname.length());
+            String total_list = "```\nФио:";
+            for (byte i = 0; i < max_len+7-6; i++)  total_list += " ";
+            total_list += "Нки:\n";
+
+            for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
+              count.surn = students[i].surname;
+              count.subgroup = students[i].subgroup;
+              count.surn_ind = len[count.subgroup];
+              len[students[i].subgroup]++;
+              list.Counting(local_diapason.end, local_diapason.start);
+
+              total_list += students[i].surname;
+              byte lim = max_len-students[i].surname.length() - (max_len-students[i].surname.length())/2;
+              lim += 7;
+              for (byte j = 0; j < lim; j++) total_list += (j != 0 && j != lim-1) ? "-" : " ";
+              total_list += count.total;
+
+              if (i != sizeof(students)/sizeof(students[0])-1) total_list += "\n";
+            }
+            total_list += "```\n";
+
+            bot.setTextMode(FB_MARKDOWN);                       // для красивой таблички
+            bot.editMessage(mess_id, total_list, user);
+            bot.setTextMode(FB_TEXT);
+          }
+
+          else if (ret_command)  {
+            ret_command = false;
+            stat_page(1);
+          }
+
+          else {                                      // обрабатывааем нажатия на неделю
+            // здесь надо суметь вычислить индекс в глобальном пространстве индексов недель [1; week_off] и засунуть его в unknown_ind
+            // здесь имеем comm = ~ "с 23.03 по 30.03"
+
+            if (comm.indexOf("Эта неделя") != -1) unknown_ind = week_off;
+            else if (comm.indexOf("Предыдущая") != -1)  unknown_ind = week_off-1;
+
+            else {
+              int8_t c_index = comm.indexOf("с");                                   // в любой строке индекс начала значащей части (без значков и отступов)
+
+              if (c_index == -1)   {                                                // на прям крайняк
+                bot.sendMessage(F("invalidMenuTextInCount!"), user);
+                return;
+              }
+
+              Date startDate;
+              startDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0');
+              startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+
+              bool found = false;
+              for (byte i = 0; i < week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
+                if (startDate.day == week[0]->pon_date.day && startDate.month == week[0]->pon_date.month)  {
+                  unknown_ind = week_off-i;
+                  found = true;
+                  break;
+                }
+
+                sumDate(&startDate, 7);
+              }
+
+              if (!found) {
+                bot.sendMessage(F("Не удалось найти индекс выбранной недели!"), user);
+              }
+            }
+
+            stat_page(2);                        // страница выбора статуса недели (Начало диапазона, конец или только эта неделя)
+            way = "032";
+          }
+        }
+        
+        else if (way = "032") {
+          if (comm == "Начало") local_diapason.start = unknown_ind;
+          else if (comm == "Конец") local_diapason.end = unknown_ind;
+          else if (comm == "Начало и конец") {
+            local_diapason.start = unknown_ind;
+            local_diapason.end = unknown_ind;
+          }
+          way = "031";
+          stat_page(1);
         }
       }
 
@@ -1002,7 +1094,6 @@ class Menu {
               }
 
               days_between += realTime.day;
-
             }
             
             else {                                                               // если выбранная неделя в будущем месяце (месяцах)
@@ -1017,7 +1108,7 @@ class Menu {
             }
 
             if (abs(days_between) % 7 != 0)  {
-              bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель!\nКритично!"), error_chat);
+              bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель!\nКритично! (settings page)"), error_chat);
               bot.sendMessage(String(days_between), error_chat);
               return;
             }
@@ -1310,7 +1401,64 @@ class Menu {
       String mess = "";
       switch (stat_depth) {
         case 0: {
-          mess = "Здесь пока ничего нет!\nНо мы работаем над этим!\nНа главную";
+          mess += "Общее УП\tОбщее неУП\tПо предметам (неУП)\n";
+          mess += "Назад\tНа главную";
+          local_diapason.start = week_off;
+          local_diapason.end = 9;                     // ВРЕМЕННО!!
+          break;
+        }
+
+        case 1: {
+          mess = "Нажмите для обозначения границ:\n";
+          mess += "Назад\tГотово\tНа главную\n";  
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          sumDate(&date_end, 6);
+
+          for (byte i = 0; i < week_off; i++) {
+            
+            if (local_diapason.start == week_off-i || local_diapason.end == week_off-i) {
+              if (local_diapason.start == week_off-i && local_diapason.end == week_off-i) mess += STARTEND_SYMBOL;
+              else if (local_diapason.start == week_off-i) mess += START_SYMBOL;
+              else mess += END_SYMBOL;
+              mess += " --- ";
+            }
+
+            if (!i) mess += "Эта неделя";
+
+            else if (i == 1) mess += "Предыдущая";
+
+            else {
+              mess += "с ";
+              if (date_start.day < 10) mess += "0";
+              mess += date_start.day;
+              mess += ".";
+              if (date_start.month < 10) mess += "0";
+              mess += date_start.month;
+              mess += " по ";
+              if (date_end.day < 10) mess += "0"; 
+              mess += date_end.day;
+              mess += ".";
+              if (date_end.month < 10) mess += "0";
+              mess += date_end.month;
+            }
+
+            sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
+            sumDate(&date_end, -7);
+
+            if (local_diapason.start == week_off-i || local_diapason.end == week_off-i) {
+              mess += " --- ";
+              if (local_diapason.start == week_off-i && local_diapason.end == week_off-i) mess += STARTEND_SYMBOL;
+              else if (local_diapason.start == week_off-i) mess += START_SYMBOL;
+              else mess += END_SYMBOL;
+            }
+
+            if (i != week_off-1) mess += "\n";
+          }
+          break;
+        }
+
+        case 2: {
+          mess = "Эта неделя ... диапазона:\nНачало\tКонец\tНачало и конец\nНа главную\tНазад";
           break;
         }
       }
@@ -1428,7 +1576,6 @@ void setup() {
   }
 
   bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
-  for (byte i = 0; i < sizeof(students)/sizeof(students[0]); i++) people_in_subgr[((!students[i].subgroup) ? 0 : 1)]++;       //считаем количество людей в каждой подгруппе самым изощренным способом
 
   menu.start_page(0, file_stat);       //чисто для обновления структуры FB_Time
   list.begin();

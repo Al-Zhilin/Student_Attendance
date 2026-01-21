@@ -169,7 +169,8 @@ void briefInput(Text message, String chat) {
       }
       if (!valid_less) {
         // убираем выставление Нок для всех пар (хз, мб нужно прерывать выставление ТОЛЬКО для этой пары, но я считаю, что при таком случае пользователь скорее всего ошибся днем и лучше его вовсе остановить)
-        serviceMess.edit("В данный день у " + String(i+1) + " подгруппы нет пары под номером " + String(found_less[less]) + "!\nПересмотрите сокращенный ввода заново!", 7000);
+        bot.sendMessage(String(ALERT_SYMBOL) + " В данный день у " + String(i+1) + " подгруппы нет пары под номером " + String(found_less[less]) + "!\nПересмотрите сокращенный ввода заново! " + String(ALERT_SYMBOL), chat);
+        timer.add(bot.lastBotMsg(), 20, chat);
         for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
         return;
       }
@@ -239,9 +240,8 @@ void briefInput(Text message, String chat) {
 
       if (func_res == 2 && syntax_errors <= min_syntax_errors) {
         if (syntax_errors == min_syntax_errors) {
-          bot.sendMessage("Невозможно однозначно определить, какая это фамилия: " + dataa.toString(), chat);
-          bot.sendMessage(students[ind].surname, error_chat);
-          timer.add(bot.lastBotMsg(), 10, chat);
+          bot.sendMessage(String(ALERT_SYMBOL) + " Невозможно однозначно определить, какая это фамилия: " + dataa.toString() + String(ALERT_SYMBOL), chat);
+          timer.add(bot.lastBotMsg(), 20, chat);
           break;
         }
 
