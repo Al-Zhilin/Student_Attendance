@@ -1,4 +1,4 @@
-void briefInput(Text message, String chat) {
+/*void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less[MAX_LESSONS] = {}, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
@@ -43,7 +43,7 @@ void briefInput(Text message, String chat) {
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
-    for (int i = 0; i < condition.length(); /*этот пункт прописан отдельно дальше*/) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста
+    for (int i = 0; i < condition.length();) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста
       byte c = condition[i], charLen = 1;
 
       if ((c & 0x80) == 0x00) charLen = 1; // ASCII
@@ -312,7 +312,7 @@ void briefInput(Text message, String chat) {
   }
 
   serviceMess.edit("Сокращенный ввод обработан!\nRAM занято: " + String(MemControl.getDiff()/1024) + " кБ.", 5000);
-}
+}*/
 
 String UpdateArrayCell(byte presence_m, String post_symbol, String old_nka) {
   if (presence_m)  return " ";

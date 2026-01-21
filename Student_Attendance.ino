@@ -6,31 +6,34 @@
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
 #include <ArduinoOTA.h>
-#include <ESPmDNS.h>          // в какой-то момент без этого явного включения скетч не скомпилился. Пускай будет.
+#include <ESPmDNS.h>          // в какой-то момент без этого явного включения компилятор начал ругаться на отсутствие либы
 #include <settings.h>
 #include "types.h"
 
 FastBot bot(BOT_TOKEN);
                                                    
-float Version = 0.5;                                                                              //текущая версия прошивки
+float Version = 0.5;                                              // текущая версия прошивки
 
 struct week_diapason {
   byte start = 0;
   byte end = 0;
 }; 
 
+struct Settings {
+  week_diapason att_diapason;                                     // диапазон недель промежуточной аттестации
+  uint8_t table_width = 10;                                       // ширина таблицы в колчестве столбцов (не считая столбец с фамилиями)
+} settings;
+
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
   int32_t status_mess[sizeof(Admins)/sizeof(Admins[0])] = {};     // id статусного сообщения в каждом чате
   int32_t menu_id[sizeof(Admins)/sizeof(Admins[0])] = {};         // id меню в каждом чате
-  week_diapason att_diapason;                                     // диапазон недель промежуточной аттестации
-
-} file_data;
-
-FileData settings_file(&FFat, "/data.dat", 'Z', &file_data, sizeof(file_data));
+} chat_settings;
 
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
-byte week_off = 1;   // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
-FileData week_file(&FFat, "/weekdata.dat", 'V', &week_off, sizeof(week_off));
+byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
+FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));   // ЗДЕСЬ ТОЖЕ!!
+FileData chat_file(&FFat, "/data.dat", 'Z', &chat_settings, sizeof(chat_settings));
+FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
 const String months[] = {               //сокращенные названия всех месяцев
   "Янв",
@@ -111,7 +114,7 @@ struct WeekInfo {
 
 } week_object[2];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
 
-WeekInfo *week[2] = {&week_object[0], &week_object[1]};           //week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели
+WeekInfo *week[2] = {&week_object[0], &week_object[1]};           //week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели. Такое объявление нужно для удобного свайпа указателей при смене четности
 
 byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors = SURNAME_ERRORS_NUM);
 
@@ -231,7 +234,7 @@ class ServiceMess {
   public:
     void edit(String edit_text, uint32_t del_period = 0) {                  // функция редактирует сервисное сообщение, а при передаче дополнительного параметра - очищает его через timeout
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1) + ((edit_text != "") ? "\n\n" : "") + edit_text, Admins[i]);
+        bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1) + ((edit_text != "") ? "\n\n" : "") + edit_text, Admins[i]);
       }
 
       if (del_period) {
@@ -269,153 +272,115 @@ class Sheet {
       //digitalWrite(2, true);
       while (!(this->ready()))  {
         ArduinoOTA.handle();
-        if (millis() - reset_timer >= 60*1000) {
-          ESP.restart();
+        static uint8_t tryes_num = 0;
+        if (millis() - reset_timer >= 60*100) {
+          tryes_num++;
+
+          if (tryes_num == GSHEET_CONNECT_ATT) {
+            bot.sendMessage(F("Вышел таймаут ожидания подключения к GoogleSheet! Перезагружаюсь..."), error_chat);
+            ESP.restart();
+          }
+
+          bot.sendMessage("Попытка подключения к GSheet " + String(tryes_num) + "/" + GSHEET_CONNECT_ATT, error_chat);
         }
+
       }
       //digitalWrite(2, false);
 
       serviceMess.edit("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
 
       for (byte i = 0; i < 2; i++) {             // парсим данные о текущей и предыдущей неделе
-        String get_cell = "", range = "", returned_string;
+        String range = "";
+        FirebaseJson returned_json;
+        FirebaseJsonData cell;
+        int8_t parity_iter = ((i == 1 && week_off == 1) ? -1 : 1);          // надобный сдвиг с обработкой чтения будущей недели при week_off = 1 вместо прошлой
       
-        //------------Получаем краткую информацию с заглавной ячейки недели-------------
-        range += Sheet;
+        //------------Получаем четность с заглавной ячейки недели-------------
+        range += SheetName;
         range += weekInfo_c;
-        range += (weekInfo_i + (offset*(week_off-i)));
+        range += (weekInfo_i + (offset*(week_off-i-parity_iter)));
         range += ":";
-        range += charOffset(String(weekInfo_c), 1);
-        range += (weekInfo_i + (offset*(week_off-i)));
-        returned_string = this->getCells(range);
-        Text answer(returned_string);
-        Text ans = answer.getSub(r_count, "\"");
+        range += charOffset(String(weekInfo_c), 1);                    // тем самым однам запросом прихватываем и ячейку "Понедельник, 22.10" для следующего этапа
+        range += (weekInfo_i + (offset*(week_off-i-parity_iter)));
+        this->getCells(returned_json, range);
 
-        for (byte iter = 0; iter < ans.count("/"); iter++) {
-          ans.getSub(iter, "/").toString(get_cell);
-          Text cell(get_cell);
-          if (!iter)  {
-            if (cell == WEEK_PARITY_NAME) week[i]->parity = false;
-            else week[i]->parity = true;
-          }
+        returned_json.get(cell, "values/[0]/[0]");
+        if (cell.success()) {         // данные присутствуют
+          if (cell.stringValue == WEEK_PARITY_NAME) week[i]->parity = false;
+          else week[i]->parity = true;
+        }
 
-          else if (iter == 1) {
-            week[i]->study_days = cell.toInt();
-          }
+        else bot.sendMessage(F("Ошибка парсинга заглавное ячейки недели!"), error_chat);
+        //------------Получаем четность с заглавной ячейки недели-------------
 
-          else { 
-            if (cell.toInt() > sizeof(lessons)/sizeof(lessons[0]))  bot.sendMessage("Не для всех пар в " + String(iter-1) + " день удается найти временные рамки! Недостаточно описанных временных рамок пар в структуре \"lessons\", чтобы обрабатывать сокращенный ввод в данный день!", error_chat);
-            week[i]->subj_num[iter-2] = cell.toInt();
-            if (!week[i]->subj_num[iter-2])  {                       //если в этот день пар нет, все равно выделяем 1 элемент, чтобы там был инициализирован 0. Возможно нужно в некоторых случаях, хезе кароч
-              week[i]->less_nums[iter-2] = new byte[1]{};
+
+        //----------------------Дата понедельника этой недели---------------------------
+        returned_json.get(cell, "values/[0]/[1]");
+        if (cell.success()) {                         // Дата присутствует в ячейке
+          String firstDayName = cell.stringValue.substring(0, cell.stringValue.indexOf(","));        // имя первого дня этой недели (может быть не понедельник)
+          String rawDate = cell.stringValue.substring(cell.stringValue.indexOf(",")+1);            // дата в сыром формате: в строке, возможны разные представления: 1.2, 12.2, 1.12, 12.11
+          
+          byte dot_index = raw_date.
+          week[i]->pon_date.day
+          week[i]->pon_date.month
+          
+
+          if (firstDayName != "понедельник" && firstDayName != "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
+            if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_date.day--;
+            else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_date.day-=2;
+            else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_date.day-=3;
+            else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_date.day-=4;
+            else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_date.day-=5;
+            else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_date.day-=6;
+            else {
+              bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\nОтвет от Sheet: \"" + answer.toString() + "\"", Admins[0]);
             }
-            else  week[i]->less_nums[iter-2] = new byte[week[i]->subj_num[iter-2]]{};                  //выделяем под каждый день с N парами в этот день ровно N ячеек (для хранения номеров каждой пары в каждый день)
-          }
-        }
-        //------------Получаем краткую информацию с заглавной ячейки недели-------------
-
-
-        //----------------------Дата понедельника этой недели---------------------------
-        ans = answer.getSub(r_count+r_offset, "\"").getSub(1, ", ");
-        
-        String firstDayName = answer.getSub(r_count+r_offset, "\"").getSub(0, ", ");        //имя первого дня этой недели (может быть не понедельник)    непонятно, нужна ли эта фигня №1
-        
-        for (byte iter = 0; iter < ans.count("."); iter++)  {
-          Text cell = ans.getSub(iter, ".");
-          for (byte q = 0; q < cell.length(); q++) {
-            if (iter == 0)  week[i]->pon_date.day = (week[i]->pon_date.day * 10 + cell[q] - '0');
-            else if (iter == 1)  week[i]->pon_date.month = (week[i]->pon_date.month * 10 + cell[q] - '0');
           }
         }
 
-        if (firstDayName != "понедельник" && firstDayName != "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
-          if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_date.day--;
-          else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_date.day-=2;
-          else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_date.day-=3;
-          else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_date.day-=4;
-          else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_date.day-=5;
-          else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_date.day-=6;
-          else {
-            bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\nОтвет от Sheet: \"" + answer.toString() + "\"", Admins[0]);
-          }
-        }
+        else bot.sendMessage(F("Ошибка парсинга даты и имени первого учебного дня недели!"), error_chat);
         //----------------------Дата понедельника этой недели---------------------------
 
 
-        //-----------------------Получение номеров всех пар-----------------------------
-        range = Sheet;
-        range += less_num_c;
-        range += (less_num_i + (offset*(week_off-i)));
+        //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
+        // Формируем: week[i]->study_days                   кол-во учебных дней
+        //            week[i]->subj_num[7]                  количество пар в каждый день
+        //            week[i]->less_nums[7][realloc]        номера всех пар в каждый день
+        uint8_t real_width = 0;
+
+        range = SheetName;
+        range += less_name_c;
+        range += less_name_i;
         range += ":";
+        range += charOffset(String(less_name_c), settings.table_width);           // после первого чтения новой таблицы система запомнит ее ширину и будет гарантированно укладываться в один запрос
+        range += less_name_i;
 
-        byte len = 0;
-        bool prev = false;
+        this->getCells(returned_json, range);                // получаем данные
 
-        for (int s = 0; s < 7; s++) {                 //ищем горизонтальную длину len строки, содержащей номера всех пар
-          if (week[i]->subj_num[s] == 0) continue;
-          if (prev) len += 1;
-          len += week[i]->subj_num[s];
-          prev = true;
+
+
+        if (real_width != settings.table_width) {
+          settings.table_width = real_width;
+          settings_file.update();
         }
-
-        range += charOffset(String(less_num_c), len-1);
-        range += (less_num_i + (offset*(week_off-i)));
-        returned_string = this->getCells(range);
-        Text answa(returned_string);
-
-        byte job_day = 0;                            //отображает дни недели 0...6 который сейчас заполняем, обеспечивает их "смену" в цикле
-        byte lesson_in_day = 0;                        //отоюражает обрабатываемую пару в какой-либо день
-
-        for (int s = 0; s < len; s++) {
-          Text this_cell = answa.getSub(r_count + r_offset*s, "\"");
-
-          if (String(this_cell) == "") {                //если попался разделитель между днями - переходим на следующий день
-            job_day++;
-            lesson_in_day = 0;
-            continue;
-          }
-
-          byte lesson_count = week[i]->subj_num[job_day];
-
-          while (!lesson_count) {               //пока пар в этот день нет
-            job_day++;
-            lesson_count = week[i]->subj_num[job_day];       //ищем день, в который они есть
-          }
-
-          //bot.sendMessage(String(this_cell) + " / " + String(lesson_count) + " / " + String(job_day),  error_chat);
-
-          week[i]->less_nums[job_day][lesson_in_day] = this_cell.toInt();
-          lesson_in_day++;
-        }
-
-        
-        /*for (int b = 0; b < 7; b++) {                     //вывод, оставим на случай отладки
-          byte ii = week[i]->subj_num[b];
-          if (!ii)  ii++;
-          for (int d = 0; d < ii; d++) {
-            bot.sendMessage(String(week[i]->less_nums[b][d]), error_chat);
-          }
-          bot.sendMessage("----------", error_chat);
-        }*/
-        //-----------------------Получение номеров всех пар-----------------------------
+        //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
       }
-      checkTableWeek();                                                 //проверяем неделю на актуальность
+      
+      //checkTableWeek();                                                 //проверяем неделю на актуальность
     }
 
 
-    String getCells(String range) {                 // функция получения Нок из таблицы (чтобы в меню отображать)
-      byte tries = 0;
-      String answ;
-      while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
-        tries++;
+      void getCells(FirebaseJson &answ, const String &range) {                 // функция получения Нок из таблицы (чтобы в меню отображать)
+        byte tries = 0;
+        answ.clear();
+        while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
+          tries++;
       }
 
       if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
-
-      return answ;
     }
 
-    void SetN(String range) {                       // базовая функция постановки Нок для одного человека в один день
+    void SetN(const String &range) {                       // базовая функция постановки Нок для одного человека в один день
       String answ = "";
       byte tries = 0;
 
@@ -464,18 +429,18 @@ class Sheet {
       }*/
       
       // == Находим позицию вставки формулы в листе === (В данной версии пока так же одинаокова для любого варианта подсчета)
-      String form_position = (!count.subgroup) ? Sheet1 : Sheet2;
+      String form_position = SheetName;
       form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + 5-1);
-      form_position += people_list_i + offset[count.subgroup] * (end_week-1) + count.surn_ind;
+      form_position += people_list_i + offset * (end_week-1) + count.surn_ind;
 
 
       if (!count.mode || count.mode == 1)  {                                  // все предметы УП ИЛИ все предметы неУП
         // === Собираем диапазон ===
         diapason = less_name_c;                                                    // символьное начало диапазона
-        diapason += people_list_i + offset[count.subgroup] * (start_week-1);        // численное начало диапазона
+        diapason += people_list_i + offset * (start_week-1);        // численное начало диапазона
         diapason += ":";
         diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
-        diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
+        diapason += people_list_i + offset * (end_week-1) + sizeof(students)/sizeof(students[0]) - 1;
 
         // === Собираем формулу === (в данном случае конечный вид: =COUNTIF(FILTER(C581:U617,MOD(ROW(C581:U617)-588,23)=0),"D")
         formula.reserve(65);
@@ -484,9 +449,9 @@ class Sheet {
         formula += ";MOD(ROW(";
         formula += diapason;
         formula += ")-";
-        formula += people_list_i + offset[count.subgroup] * (start_week-1) + count.surn_ind;
+        formula += people_list_i + offset * (start_week-1) + count.surn_ind;
         formula += ";";
-        formula += offset[count.subgroup];
+        formula += offset;
         formula += ")=0);\"";
         formula += (!count.mode) ? RESPECT_SYMBOL : DISREP_SYMBOL;                                // в зависимости от вида поиска ищем конкретный символ
         formula += "\")";
@@ -495,10 +460,10 @@ class Sheet {
       else if (count.mode == 2)   {        //по отдельным предметам неУП
         // === Собираем диапазон ===
         diapason = less_name_c;
-        diapason += less_name_i + offset[count.subgroup] * (start_week-1);
+        diapason += less_name_i + offset * (start_week-1);
         diapason += ":";
         diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
-        diapason += people_list_i + offset[count.subgroup] * (end_week-1) + people_in_subgr[count.subgroup] - 1;
+        diapason += people_list_i + offset * (end_week-1) + sizeof(students)/sizeof(students[0]) - 1;
 
         // === Собираем формулу ===, в данном случае ее конечный вид:
         // =COUNTIFS(FILTER(C244:U284; MOD(ROW(C244:U284)-244;24)=0); "Физ практикум (лб)"; FILTER(C244:U284; MOD(ROW(C244:U284)-244-2;24)=0); "D")
@@ -508,9 +473,9 @@ class Sheet {
         formula += ";MOD(ROW(";
         formula += diapason;
         formula += ")-";
-        formula += less_name_i + offset[count.subgroup] * (start_week-1);
+        formula += less_name_i + offset * (start_week-1);
         formula += ";";
-        formula += offset[count.subgroup];
+        formula += offset;
         formula += ")=0);\"";
         formula += count.subject;
         formula += "\";FILTER(";
@@ -518,11 +483,11 @@ class Sheet {
         formula += ";MOD(ROW(";
         formula += diapason;
         formula += ")-";
-        formula += less_name_i + offset[count.subgroup] * (start_week-1);
+        formula += less_name_i + offset * (start_week-1);
         formula += "-";
         formula += 2+count.surn_ind;
         formula += ";";
-        formula += offset[count.subgroup];
+        formula += offset;
         formula += ")=0);\"";
         formula += DISREP_SYMBOL;
         formula += "\")";
@@ -587,24 +552,24 @@ class Menu {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
           if (file_status == FD_WRITE || file_status == FD_ADD) {
             bot.sendMessage("ИСиТенок v" + String(Version, 1), Admins[i]);
-            file_data.status_mess[i] = bot.lastBotMsg();
+            chat_settings.status_mess[i] = bot.lastBotMsg();
           }
-          else bot.editMessage(file_data.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);
+          else bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);
         }
-        settings_file.update();
+        chat_file.update();
         return;
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         if (file_status == FD_WRITE || file_status == FD_ADD) {
           bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
-          file_data.menu_id[i] = bot.lastBotMsg();
+          chat_settings.menu_id[i] = bot.lastBotMsg();
         }
-        else  bot.editMenu(file_data.menu_id[i], s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
+        else  bot.editMenu(chat_settings.menu_id[i], s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
       }
 
       bot.notify(false);
-      settings_file.update();
+      chat_file.update();
     }
 
     void menuEdit(String comm, String user) {        // обработка нажатий в меню
@@ -727,8 +692,7 @@ class Menu {
           else if (comm == "Поставить") {                                              // поставить введенные Нки
             String range;
             getNIndex();                              //подумать, нужно ли оно тут
-            if (!nka.subgroup) range += Sheet1;
-            else range += Sheet2;
+            range += SheetName;
             range += nka.posC;
             range += nka.posI;
             range += ":";
@@ -1038,7 +1002,7 @@ class Menu {
           }
         }
         
-        else if (way = "032") {
+        else if (way == "032") {
           if (comm == "Начало") local_diapason.start = unknown_ind;
           else if (comm == "Конец") local_diapason.end = unknown_ind;
           else if (comm == "Начало и конец") {
@@ -1157,8 +1121,7 @@ class Menu {
           if (week[week_index]->subj_num[nka.dayWeek-1])  {               //если в этот день пары есть (в день, соответственной Нке по четности, недели)
             if (reading_flag) {
               nka.nki = "";                                                 //разобраться, почему нужна эта заплатка и починить (если очень захочется :) )
-              if (!nka.subgroup) range += Sheet1;
-              else range += Sheet2;
+              range += SheetName;
               range += nka.posC;
               range += nka.posI;
               range += ":";
@@ -1281,7 +1244,7 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
+        bot.editMenu(chat_settings.menu_id[i], mess, Admins[i]);
       }
     }
 
@@ -1393,7 +1356,7 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
-        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
+        bot.editMenu(chat_settings.menu_id[i], mess, Admins[i]);
       }
     }
 
@@ -1464,7 +1427,7 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
-        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
+        bot.editMenu(chat_settings.menu_id[i], mess, Admins[i]);
       }
     }
 
@@ -1479,8 +1442,8 @@ class Menu {
         case 1: {
           mess = "Нажмите для обожначения границ:\nНазад\tГотово\tНа главную\n";
           week_diapason centre;
-          centre.start = (!file_data.att_diapason.start) ? week_off+2 : file_data.att_diapason.start;
-          centre.end = (!file_data.att_diapason.end) ? week_off-2 : file_data.att_diapason.end;
+          centre.start = (!settings.att_diapason.start) ? week_off+2 : settings.att_diapason.start;
+          centre.end = (!settings.att_diapason.end) ? week_off-2 : settings.att_diapason.end;
 
           Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
           sumDate(&date_end, 6);
@@ -1494,7 +1457,7 @@ class Menu {
 
           for (byte i = 0; i < 5 + prev_weeks + abs(centre.start - centre.end); i++) {         // отображаем 4 недели до, 4 после, и все недели, входящие в промежутку. Иначе - то же самое, но вместо недель промежутки - актуальная неделя
             byte start_offset = week_off - i + prev_weeks + ((centre.start - centre.end > 1) ? centre.start - centre.end+1: centre.start - centre.end)/2;
-            if (file_data.att_diapason.start && (centre.start == start_offset || centre.end == start_offset)) {     // если надо - в начале ячейки недели ставим спецсимвол
+            if (settings.att_diapason.start && (centre.start == start_offset || centre.end == start_offset)) {     // если надо - в начале ячейки недели ставим спецсимвол
               if (centre.start == start_offset && centre.end == start_offset) mess += STARTEND_SYMBOL;
               else if (centre.start == start_offset) mess += START_SYMBOL;
               else mess += END_SYMBOL;
@@ -1517,7 +1480,7 @@ class Menu {
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
 
-            if (file_data.att_diapason.start && (centre.start == start_offset || centre.end == start_offset)) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
+            if (settings.att_diapason.start && (centre.start == start_offset || centre.end == start_offset)) {     // если надо - в конце ячейки недели тоже ставим спецсимвол
               mess += " --- ";
               if (centre.start == start_offset && centre.end == start_offset) mess += STARTEND_SYMBOL;
               else if (centre.start == start_offset) mess += START_SYMBOL;
@@ -1532,7 +1495,7 @@ class Menu {
       }
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {                 // обновляем страницу у всех пользователей
-        bot.editMenu(file_data.menu_id[i], mess, Admins[i]);
+        bot.editMenu(chat_settings.menu_id[i], mess, Admins[i]);
       }
     }
 
@@ -1551,17 +1514,18 @@ void setup() {
   if (!FFat.begin()) {                                                          // подключаем файловую систему
     bot.sendMessage(F("Ошибка инициализации файловой системы!"), error_chat);
   }
-  settings_file.addWithoutWipe(true);
+  chat_file.addWithoutWipe(true);
   FDstat_t file_stat;
 
-  for (byte files = 0; files < 2; files++) {
-    if (files)  file_stat = settings_file.read();
-    else file_stat = week_file.read();
+  for (byte files = 0; files < 3; files++) {
+    if (!files)  file_stat = chat_file.read();
+    else if (files == 1) file_stat = week_file.read();
+    else file_stat = settings_file.read();
 
     switch (file_stat) {
       case FD_FS_ERR: bot.sendMessage(F("FileSystemError!"), error_chat);
         break;
-      case FD_FILE_ERR: bot.sendMessage("OpenFileError: " + String((!files) ? "week_file!" : "settings_file!"), error_chat);
+      case FD_FILE_ERR: bot.sendMessage("OpenFileError!");
         break;
       default:
         break;
@@ -1592,8 +1556,9 @@ void loop() {
 
   bot.tick();
   realTime = bot.getTime(3);
-  settings_file.tick();
+  chat_file.tick();
   week_file.tick();
+  settings_file.tick();
   timer.tick();
   serviceMess.tick();
   ArduinoOTA.handle();
@@ -1605,7 +1570,7 @@ void loop() {
   }
   if (!old_day && realTime.day)  old_day = realTime.day;
   else if (old_day != realTime.day) {                        //если сменился день - повод проверить актуальность недели
-    checkTableWeek();
+    //checkTableWeek();
     old_day = realTime.day;
   }
 

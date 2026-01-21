@@ -54,7 +54,7 @@ void newMsg(FB_msg& msg) {
       else {
         Text mess_text(msg.text);
         MemoryControl MemControl;
-        briefInput(mess_text.decodeUnicode(), msg.chatID);                                    //обработка возможного сокращенного ввода
+        //briefInput(mess_text.decodeUnicode(), msg.chatID);                                    //обработка возможного сокращенного ввода
         MemControl.check();
         bot.sendMessage("Разница до и после функции: " + String(MemControl.getDiff()), error_chat);
         timer.add(bot.lastBotMsg(), 20, error_chat);
