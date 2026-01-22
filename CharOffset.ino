@@ -4,7 +4,7 @@ String charOffset(String str, int off) {
   char d = 'A'; // Значение по умолчанию для первой буквы
 
   if (str.length() == 0) {                            //Обработка случая пустой строки
-      bot.sendMessage("err_charOffset", error_chat);
+      bot.sendMessage(F("err_charOffset"), error_chat);
       return str;
   }
   else if (str.length() == 1) {
@@ -15,7 +15,7 @@ String charOffset(String str, int off) {
     c = str[1];
   }
   else {
-    bot.sendMessage("err_charOffset", error_chat);
+    bot.sendMessage(F("err_charOffset"), error_chat);
     return str;
   }
 

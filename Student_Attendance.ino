@@ -2,6 +2,7 @@
 
 #include <FastBot.h>
 #include <FileData.h>
+#include <Stamp.h>
 #include <FFat.h>
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
@@ -12,7 +13,7 @@
 
 FastBot bot(BOT_TOKEN);
                                                    
-float Version = 0.5;                                              // текущая версия прошивки
+float Version = 0.7;                                              // текущая версия прошивки
 
 struct week_diapason {
   byte start = 0;
@@ -21,7 +22,7 @@ struct week_diapason {
 
 struct Settings {
   week_diapason att_diapason;                                     // диапазон недель промежуточной аттестации
-  uint8_t table_width = 10;                                       // ширина таблицы в колчестве столбцов (не считая столбец с фамилиями)
+  uint8_t table_width = 10;                                       // ширина таблицы в количестве столбцов (не считая столбец с фамилиями). После первого чтения новой таблицы обновиться до актуального значения
 } settings;
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
@@ -31,7 +32,7 @@ struct fileData {                                                 // струк�
 
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
 byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
-FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));   // ЗДЕСЬ ТОЖЕ!!
+FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));   // ЗДЕСЬ ТОЖЕ НЕ ТРОГАТЬ!!
 FileData chat_file(&FFat, "/data.dat", 'Z', &chat_settings, sizeof(chat_settings));
 FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
@@ -50,37 +51,33 @@ const String months[] = {               //сокращенные названи�
   "Дек",
 };
 
-byte day_month[] = {        //количество дней в каждом месяце года. Для актуализации високосности есть отдельная функция
-  31,
-  28,
-  31,
-  30, 
-  31,
-  30,
-  31,
-  31,
-  30,
-  31,
-  30,
-  31,
-};
+uint8_t getDayInMonth(uint8_t month, uint16_t year) {                     // year нужно для проверки высокосности февраля. Нумерация месяцев: 0...11
+  byte day_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+  if (month == 1) return day_month[month] + ((StampUtils::isLeap(year)) ? 1 : 0);         // учитываем возможные 29 дней
+  return day_month[month]
+}
 
 struct Date {
-  byte day = 0;
-  byte month = 0;
+  uint8_t day = 0;
+  uint8_t month = 0;
+  uint16_t year = 0;
 
-  Date(byte dday, byte mmonth) : day(dday), month(mmonth) {
+  Date(uint8_t dday, uint8_t mmonth, uint16_t yyear) : day(dday), month(mmonth), year(yyear) {
     if (mmonth < 1 || mmonth > 12) {
       bot.sendMessage(F("InvalidMonthInDateConstructor!"), error_chat);
-      month = 0;
+      month = 1;
     }
-    if (dday < 1 || dday > day_month[mmonth]) {
+    if (yyear < 1 || yyear > 4096) {
+      bot.sendMessage(F("InvalidYearInDateConstructor!"), error_chat);
+      year = 1970;
+    }
+    if (dday < 1 || dday > getDayInMonth(mmonth, year)) {
       bot.sendMessage(F("InvalidDayInDateConstructor!"), error_chat);
-      day = 0;
-    }    
+      day = 1;
+    }
   }
 
-  Date() : day(0), month(0) {};
+  Date() : day(1), month(1), year(1970) {};
 };
 
 String PROGMEM DaysOfWeek[] = {
@@ -96,9 +93,8 @@ String PROGMEM DaysOfWeek[] = {
 struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
   String nki;           //строка, в которой каждый индекс строки обозначает тип пропуска, соответственно каждой паре выбранного дня
-  Date date;            //день и месяц выставления Нки
+  Date date;            //дата выставления Нки
   byte dayWeek;         //день недели (1-7 / понедельник-воскресенье)
-  String year;          //год 
   String posC;          //символьная составлющая координаты ячейки
   int posI;             //численная составляющая координаты ячейки
   bool subgroup;        //подгруппа (false/true, 1/2 соответственно)
@@ -126,18 +122,6 @@ struct CountInfo {
   String subject;
   byte mode;      //0 -  все предметы УП, 1 - все предметы неУП, 2 - по отдельным предметам неУП
 } count;
-
-void checkYear() {
-  FB_Time t = bot.getTime(3);
-  if (t.year % 4 == 0)  {
-    if (t.year % 100 == 0)  {
-      if (t.year % 400 == 0) day_month[1] = 29;
-      else day_month[1] = 28;
-    }
-    else day_month[1] = 29;
-  }
-  else day_month[1] = 28;
-}
 
 struct timer_data {
   uint32_t start_millis = 0;
@@ -305,24 +289,43 @@ class Sheet {
         this->getCells(returned_json, range);
 
         returned_json.get(cell, "values/[0]/[0]");
-        if (cell.success()) {         // данные присутствуют
+        if (cell.success) {         // данные присутствуют
           if (cell.stringValue == WEEK_PARITY_NAME) week[i]->parity = false;
           else week[i]->parity = true;
         }
 
-        else bot.sendMessage(F("Ошибка парсинга заглавное ячейки недели!"), error_chat);
+        else {
+          bot.sendMessage(F("Ошибка парсинга заглавное ячейки недели!"), error_chat);
+          CriticalError();
+        }
         //------------Получаем четность с заглавной ячейки недели-------------
 
 
         //----------------------Дата понедельника этой недели---------------------------
         returned_json.get(cell, "values/[0]/[1]");
-        if (cell.success()) {                         // Дата присутствует в ячейке
-          String firstDayName = cell.stringValue.substring(0, cell.stringValue.indexOf(","));        // имя первого дня этой недели (может быть не понедельник)
+        if (cell.success) {                         // Дата присутствует в ячейке
+          String firstDayName = cell.stringValue.substring(0, cell.stringValue.indexOf(","));      // имя первого дня этой недели (может быть не понедельник)
           String rawDate = cell.stringValue.substring(cell.stringValue.indexOf(",")+1);            // дата в сыром формате: в строке, возможны разные представления: 1.2, 12.2, 1.12, 12.11
           
-          byte dot_index = raw_date.
-          week[i]->pon_date.day
-          week[i]->pon_date.month
+          uint8_t firstDot = rawDate.indexOf(".");
+          uint8_t secondDot = rawDate.lastIndexOf(".");
+
+          if (firstDot != -1 && secondDot != -1 && firstDot != secondDot) {                        // условие корректности формата даты в ячейке (X.Y.Z)
+            week[i]->pon_date.day = rawDate.substring(0, firstDot).toInt();
+            week[i]->pon_date.month = rawDate.substring(firstDot + 1, secondDot).toInt();
+            uint16_t parsedYear = rawDate.substring(secondDot + 1).toInt();
+
+            if (parsedYear < 100) {                                                                // если в таблице год указан неполно (26 вместо 2026) - достараиваем недостающую часть
+                week[i]->pon_date.year = (realTime.year / 100) * 100 + parsedYear;
+            } else {
+                week[i]->pon_date.year = parsedYear;
+            }
+          }
+
+          else {
+            bot.sendMessage(F("Структура заглавной ячейки недели некорректна!"), error_chat);
+            CriticalError();
+          }
           
 
           if (firstDayName != "понедельник" && firstDayName != "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
@@ -357,6 +360,12 @@ class Sheet {
 
         this->getCells(returned_json, range);                // получаем данные
 
+        // читаем строку
+        // идемм по ней с помощью функций хождения по json
+        // по алоритму заполоняем нужные нам (указанные выше) данные
+        // если json кончился, а предпосылки на данные есть - читаем еще кусок фиксированной длины
+        // не забываем обновлять real_width, чтобы оптимизировать процесс поиска (причем для каждой четности неделя может быть разной длины -> учитываем)
+        // как только встретили 2 пустые ячейки подряд - наша остановочка (конец недели)
 
 
         if (real_width != settings.table_width) {
@@ -624,7 +633,7 @@ class Menu {
           nka.nki = "";
           nka.date.month = t.month;
           nka.date.day = t.day;
-          nka.year = t.year;
+          nka.date.year = t.year;
           nka.dayWeek = t.dayWeek;
           nka.posC = 'A';
           nka.posI = 0;
@@ -722,7 +731,7 @@ class Menu {
         else if (way == "0111") {                                                          // выбор месяца
           nka.date.month = t.month;
           nka.date.day = t.day;
-          nka.year = t.year;
+          nka.date.year = t.year;
           nka.dayWeek = t.dayWeek;
           for (int i = 0; i < 12; i++) {
             if (comm == months[i]) {
@@ -782,7 +791,7 @@ class Menu {
           nka.nki = "";
           nka.date.month = t.month;
           nka.date.day = t.day;
-          nka.year = t.year;
+          nka.date.year = t.year;
           nka.dayWeek = t.dayWeek;
           nka.posC = 'A';
           nka.posI = 0;
@@ -1113,8 +1122,8 @@ class Menu {
           if (nka.date.month < 10) mess += "0";
           mess += nka.date.month;
           mess += ".";
-          mess += nka.year[2];
-          mess += nka.year[3];
+          mess += nka.date.year[2];
+          mess += nka.date.year[3];
           mess += "\n";
           getNIndex();
           byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);                               //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
@@ -1211,7 +1220,7 @@ class Menu {
           byte pre_offset = nka.dayWeek-1;
           byte post_offset;
           if (nka.date.month == t.month) nka.date.day = day_n;
-          else  nka.date.day = day_month[nka.date.month-1];
+          else  nka.date.day = getDayInMonth(nka.date.month-1, nka.date.year);
           getNIndex();
           post_offset = 7 - nka.dayWeek;
           nka.date.day = day_n;
@@ -1221,7 +1230,7 @@ class Menu {
 
           for (byte i = 0; i < pre_offset; i++) mess += " \t";
 
-          for (byte i = k-1; i < day_month[nka.date.month-1]; i++) {
+          for (byte i = k-1; i < getDayInMonth(nka.date.month-1, nka.date.year); i++) {
             mess += i+1;
             if ((i+pre_offset-k) % 7 == 5)  mess += "\n";
             else mess += "\t";
@@ -1285,7 +1294,7 @@ class Menu {
         case 3: {                                                                      // страница, предлагающая выбор диапазона недель для подсчета
           mess = "Нажмите для обозначения границ:\n";
           mess += "Назад\tГотово\tНа главную\n";  
-          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year), date_end(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
           sumDate(&date_end, 6);
 
           for (byte i = 0; i < week_off; i++) {
@@ -1374,7 +1383,7 @@ class Menu {
         case 1: {
           mess = "Нажмите для обозначения границ:\n";
           mess += "Назад\tГотово\tНа главную\n";  
-          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year), date_end(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date->year);
           sumDate(&date_end, 6);
 
           for (byte i = 0; i < week_off; i++) {
@@ -1445,7 +1454,7 @@ class Menu {
           centre.start = (!settings.att_diapason.start) ? week_off+2 : settings.att_diapason.start;
           centre.end = (!settings.att_diapason.end) ? week_off-2 : settings.att_diapason.end;
 
-          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month), date_end(week[0]->pon_date.day, week[0]->pon_date.month);
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year), date_end(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
           sumDate(&date_end, 6);
 
           // нужно подвинуть даты начала и конца недели до валидных значений (до недели начала промежутки (или до текущей недели) - минус 4 недели (или меньше) назад, именно с таких дат начинаем список)
@@ -1541,21 +1550,18 @@ void setup() {
 
   bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
 
-  menu.start_page(0, file_stat);       //чисто для обновления структуры FB_Time
+  menu.start_page(0, file_stat);       // чисто для обновления структуры FB_Time
   list.begin();
-  menu.start_page(1, file_stat);       //вот тут уже отсылаем менюшку
-  checkYear();              //проверяем год на високосность
+  menu.start_page(1, file_stat);       // вот тут уже отсылаем менюшку
   bot.sendMessage("Запускаюсь!!", error_chat);
 }
 
 void loop() {
-  static int old_year = 0;
-  static byte old_day = 0;
+  static uint8_t old_day = 0;
   static uint32_t heap_timeout = millis();
   MemoryControl MemControl;
 
   bot.tick();
-  realTime = bot.getTime(3);
   chat_file.tick();
   week_file.tick();
   settings_file.tick();
@@ -1563,13 +1569,10 @@ void loop() {
   serviceMess.tick();
   ArduinoOTA.handle();
 
-  if (!old_year && realTime.year)  old_year = realTime.year;        //Запоминаем год при запуске только после того, как время синхронизировано. Возможно в будущем заменим записью в EEPROM 
-  else if (old_year != realTime.year)  {                     //Если год сменился - опа, произошел новый год, то проверяем на високосность
-    checkYear();
-    old_year = realTime.year;
-  }
-  if (!old_day && realTime.day)  old_day = realTime.day;
-  else if (old_day != realTime.day) {                        //если сменился день - повод проверить актуальность недели
+  realTime = bot.getTime(3);
+
+  if (!old_day && realTime.day)  old_day = realTime.day;      // если структура realTime обновилась = запоминаем день
+  else if (old_day != realTime.day) {                         // если сменился день - повод проверить актуальность недели
     //checkTableWeek();
     old_day = realTime.day;
   }
