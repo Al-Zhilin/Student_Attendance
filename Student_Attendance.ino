@@ -22,7 +22,7 @@ struct week_diapason {
 
 struct Settings {
   week_diapason att_diapason;                                     // диапазон недель промежуточной аттестации
-  uint8_t table_width = 10;                                       // ширина таблицы в количестве столбцов (не считая столбец с фамилиями). После первого чтения новой таблицы обновиться до актуального значения
+  uint8_t table_width[2] = {10, 10};                              // ширина таблицы (текущей и противоположной четности) в количестве столбцов (не считая столбец с фамилиями). После первого чтения новой таблицы обновиться до актуального значения
 } settings;
 
 struct fileData {                                                 // структуры настроек, записывамых в энергонезависимую память
@@ -53,7 +53,7 @@ const String months[] = {               //сокращенные названи�
 
 uint8_t getDayInMonth(uint8_t month, uint16_t year) {                     // year нужно для проверки высокосности февраля. Нумерация месяцев: 0...11
   byte day_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-  if (month == 1) return day_month[month] + ((StampUtils::isLeap(year)) ? 1 : 0);         // учитываем возможные 29 дней
+  if (month == 1) return day_month[month] + ((StampUtils::isLeap(year)) ? 1 : 0);         // учитываем возможные 29 дней февраля
   return day_month[month]
 }
 
@@ -78,6 +78,12 @@ struct Date {
   }
 
   Date() : day(1), month(1), year(1970) {};
+  
+  void operator= (const Date& other) {                // перегружаем присваивание
+    this->day = other.day;
+    this->month = other.month;
+    this->year = other.year;
+  }
 };
 
 String PROGMEM DaysOfWeek[] = {
@@ -180,7 +186,7 @@ class DeleteTimer {
   void MyRealloc() {            //очищаем массив от данных обьектов, которые уже сработали
     byte delete_num = 0;
 
-    if (ptr == nullptr)   return;           //невозможная ситуация, но пропишем и ее на всякий
+    if (ptr == nullptr)   return;           //пропишем и эту ситуацию на всякий
 
     for (byte i = 0; i < timer_size; i++) {                 //узнаем, сколько элементов надо удалить
       if (ptr[i].message_id == -1)  delete_num++;
@@ -359,6 +365,16 @@ class Sheet {
         range += less_name_i;
 
         this->getCells(returned_json, range);                // получаем данные
+        String adasd = "";
+        returned_json.toString(adasd);
+        bot.sendMessage(adasd, error_chat);
+
+        /*char path = "values/[0]/[0]";
+        for (uint8_t path_iter = 0; path_iter < settings.table_width; path_iter++) {
+          path[12] = static_cast<char>(path_iter);
+          FirebaseJsonData cell;
+          returned_json.get(cell, path);
+        }*/
 
         // читаем строку
         // идемм по ней с помощью функций хождения по json

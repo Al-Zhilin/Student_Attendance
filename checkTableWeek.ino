@@ -1,9 +1,7 @@
-/*int8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
+int8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
 
   realTime = bot.getTime(3);         //обновили время
   serviceMess.edit("Проверяю актуальность недели в таблице...");
-
-  //добавить в будущем проверку перехода через новый год и на разные даты последней недели в 2 листах, если нужно
 
   if (!bot.timeSynced()) {
     bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
@@ -12,227 +10,189 @@
   }
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
-  Date dateToWeek(week[0]->pon_date.day, week[0]->pon_date.month);
-  
-  byte pulled_day = dateToWeek.day + (realTime.dayWeek-1);         //далее сравниывем даты по дням недели. week[i].pon_day всегда дата понедельника, а прибавлением дня недели делаем дату, соответственно текущему дню недели. Упрощает дальнейшие расчеты
-  byte pulled_month = dateToWeek.month;
-
-  if (pulled_day > day_month[pulled_month-1]) {
-    pulled_day -= day_month[pulled_month-1];
-    pulled_month++;
-  }
+  Date dateToWeek(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
+  sumDate(&dateToWeek, realTime.dayWeek-1);                        //временно сравняем дни недели реальной даты и последней недели в таблице, чтобы сделать все расчеты кратнымии и тем самым сильно упростить их
 
   byte weeksToBuild = 0;
 
-  if (pulled_month == realTime.month) {       //если месяцы одинаковые
-    if (realTime.day == pulled_day) {
+  if (dateToWeek.month == realTime.month) {       // если месяцы одинаковые
+    if (realTime.day == dateToWeek->day) {                  // еще и дни совпали
       serviceMess.edit("В таблице записана актуальная неделя!", 5000);
       return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!
     }
 
     else {
-      weeksToBuild = (realTime.day - pulled_day) / 7;      //количество недель, которые нужно достроить
+      weeksToBuild = (realTime.day - dateToWeek->day) / 7;      //количество недель, которые нужно достроить
     }
   }
 
   else {
-    int days_between = day_month[pulled_month - 1] - pulled_day;
+    int days_between = getDayInMonth(dateToWeek.month-1, dateToWeek.year) - dateToWeek.day;                  // сначала остаток дней до конца "вытянутого" месяца
 
-    for (byte i = pulled_month; i < realTime.month - 1; i++) {
-      days_between += day_month[i];
+    for (byte i = dateToWeek.month; i < realTime.month - 1; i++) {                                                  // потом все целые месяцы между
+      days_between += getDayInMonth(i, dateToWeek.year);
+      //--------------------------------------------------------------- учитывать год!!!!!!!------------------------------------------------------------------------------------------------------------
     }
 
-    days_between += realTime.day;
+    days_between += realTime.day;                                                                               // а потом и часть дней, уже прошедших в текущем месяце
     weeksToBuild = days_between / 7;
     if (days_between % 7 != 0)  {
-      bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);
-      serviceMess.edit("Достроение недель прервано в связи с некоректным временем в системе!", 10000);
+      bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);         // т.к. мы ранее выравнивали вытянутую дату по дню недели с текущей, то такой остаток явно показывает ошибку в логике расчета
+      serviceMess.edit("Достроение недель прервано в связи с некорректной работой алгоритма расчета!", 10000);
       return -1;
     }
   }
-  //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
   
-  if (week_off + weeksToBuild < 3) {
+  if (week_off + weeksToBuild < 3) {                                        // т.к. первые 2 недели в таблице всего построены изначально - их нет смысла рисовать, просто документируем этот факт и идем пить чяй
     serviceMess.edit("В таблице записана актуальная неделя!", 5000);
     week_off += weeksToBuild;
     week_file.update();
     return weeksToBuild;
   }
 
+  sumDate(&dateToWeek, -(realTime.dayWeek-1));                              // сдвинули обратно (см. выше), нам теперь важны актуальные данные
   serviceMess.edit("Нужно достроить недель: " + String(weeksToBuild));
 
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
-  byte tableLen[2] = {};        //длина таблицы для 2 четностей той подгруппы, таблица в которой сейчас достраивается
+  MemoryControl MemControl;             // для контроля свободной оперы во время тяжелый операций с Ohhh Sheet`ом и Json`ом Стетхэмом
 
-  MemoryControl MemControl;
-
-  if (!MemControl.check())  {
+  if (!MemControl.check())  {           // вот так кстати оно и проверяется. В будущем оформим в более компактную и красивую форму
     bot.sendMessage(F("Возможна нехватка свободной памяти!\nКритично!"), error_chat);
-    return -1;                     // подумать!
+    return -1;                          // подумать! я правда уже забыл, о чем надо подумать....
   }
   
-  for (byte i = 0; i < 2; i++) {                          //цикл для листов 2 подгрупп
-    // Получаем данные о парах каждого дня недели противоположной и настоящей четности подгруппы (нужно для tableLen и дальнейшего заполнения)
-    for (byte z = 0; z < 2; z++) {        //цикл получает нужные данные для данной недели и для недели прошлой четности
-      // ищем 2 длины - для каждой четности недели у i подгруппы
-      bool prev = false;
-      tableLen[z] = 0;
+  sumDate(&dateToWeek, 6);
 
-      for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (week[i+2*z]->subj_num[s] == 0) continue;
-        if (prev) tableLen[z] += 1;
-        tableLen[z] += week[i+2*z]->subj_num[s];
-        prev = true;
-      }
-    }
-    
-    dateToWeek.day = week[i]->pon_date.day;
-    dateToWeek.month = week[i]->pon_date.month;
-    sumDate(&dateToWeek, 6);
+  for (byte iter = ((week_off == 1) ? 1 : 0); iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель. Учитывает, что первые 2 недели в таблице всегда построены
 
-    for (byte iter = ((week_off == 1) ? 1 : 0); iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель. Учитывает, что первые 2 недели в таблице всегда построены
+    MemControl.resetKeep();         // сбрасывает сохраненное значение памяти
 
-      MemControl.resetKeep();
+    FirebaseJsonArray requests;     // массив запросов
+    FirebaseJson request;           // здесь запросы собираются перед попаданием в массив
 
-      FirebaseJsonArray requests;     //массив запросов
-      FirebaseJson request;         //храним по очереди все запросы перед добавлением в массив запросовE
+    serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild));
 
-      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2");
+    //---------------------------------------------------------Сopy-Paste запрос---------------------------------------------------------
+    request.set("copyPaste/source/sheetId", SHEET_ID);
 
-      //---------------------------------------------------------Сopy-Paste запрос---------------------------------------------------------
-      if (!i)
-        request.set("copyPaste/source/sheetId", SHEET1_ID);
-      else
-        request.set("copyPaste/source/sheetId", SHEET2_ID);
+    request.set("copyPaste/source/startRowIndex", (weekInfo_i + (offset * (week_off - 2 + iter))) - 1);
+    request.set("copyPaste/source/endRowIndex", (people_list_i + (offset * (week_off - 2 + iter)) + sizeof(students)/sizeof(students[0]) - 1));
+    request.set("copyPaste/source/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
+    request.set("copyPaste/source/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), settings.table_width[iter % 2 == 0])));
 
-      request.set("copyPaste/source/startRowIndex", (weekInfo_i + (offset * (week_off - 2 + iter))) - 1);
-      request.set("copyPaste/source/endRowIndex", (people_list_i + (offset * (week_off - 2 + iter)) + people_in_subgr[i] - 1));
-      request.set("copyPaste/source/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
-      request.set("copyPaste/source/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
+    request.set("copyPaste/destination/sheetId", SHEET_ID);
 
-      if (!i)
-        request.set("copyPaste/destination/sheetId", SHEET1_ID);
-      else
-        request.set("copyPaste/destination/sheetId", SHEET2_ID);
+    request.set("copyPaste/destination/startRowIndex", (weekInfo_i + (offset * (week_off + iter)) - 1));
+    request.set("copyPaste/destination/endRowIndex", (people_list_i + (offset * (week_off + iter)) + sizeof(students)/sizeof(students[0]) - 1));
+    request.set("copyPaste/destination/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
+    request.set("copyPaste/destination/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), settings.table_width[iter % 2 == 0])));
 
-      request.set("copyPaste/destination/startRowIndex", (weekInfo_i + (offset * (week_off + iter)) - 1));
-      request.set("copyPaste/destination/endRowIndex", (people_list_i + (offset * (week_off + iter)) + people_in_subgr[i] - 1));
-      request.set("copyPaste/destination/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), -1)));
-      request.set("copyPaste/destination/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
+    request.set("copyPaste/pasteType", "PASTE_NORMAL");
 
-      request.set("copyPaste/pasteType", "PASTE_NORMAL");
+    requests.add(request);
+    request.clear();
 
-      requests.add(request);
-      request.clear();
-
-      if (!MemControl.check()) {
-        bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
-        requests.clear();
-      }
-      //---------------------------------------------------------Сopy-Paste запрос---------------------------------------------------------
-
-
-
-      //------------------------------------------------------Запрос очистки диапазона------------------------------------------------------
-      if (!i)
-        request.set("repeatCell/range/sheetId", SHEET1_ID);
-      else
-        request.set("repeatCell/range/sheetId", SHEET2_ID);
-
-      request.set("repeatCell/range/startRowIndex", (people_list_i + (offset * (week_off + iter))) - 1);
-      request.set("repeatCell/range/endRowIndex", (people_list_i + (offset * (week_off + iter)) + people_in_subgr[i] - 1));
-      request.set("repeatCell/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
-      request.set("repeatCell/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
-
-      request.set("repeatCell/cell/userEnteredValue/stringValue", "");
-      request.set("repeatCell/fields", "userEnteredValue");
-
-      requests.add(request);
-      request.clear();
-
-      if (!MemControl.check()) {
-        bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
-        requests.clear();
-      }
-      //------------------------------------------------------Запрос очистки диапазона------------------------------------------------------
-
-
-
-      //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
-      FirebaseJsonArray valuesArray;
-
-      if (!i)
-        request.set("updateCells/range/sheetId", SHEET1_ID);
-      else
-        request.set("updateCells/range/sheetId", SHEET2_ID);
-      
-      request.set("updateCells/range/startRowIndex", (weekInfo_i + (offset * (week_off + iter)) - 1));
-      request.set("updateCells/range/endRowIndex", (weekInfo_i + (offset * (week_off + iter))));
-      request.set("updateCells/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
-      request.set("updateCells/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), tableLen[iter % 2 == 0])));
-
-      String Value = "";
-      bool prev = false;
-
-      for (byte j = 0; j < 7; j++) {     
-        byte numSubjects = 0;               //введем для читаемости в отдельную переменную
-
-        if (iter % 2 != 0) numSubjects = week[i]->subj_num[j];
-        else  numSubjects = week[i+2]->subj_num[j];   
-
-        if (!numSubjects) {
-          sumDate(&dateToWeek, 1);      //+1, т.к. переходим к следующему дню
-          continue;             //если пар в этот день нет - пропускаем
-        }
-
-        if (prev) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
-          
-        sumDate(&dateToWeek, 1);
-
-        Value = DaysOfWeek[j];                                               //день недели
-        Value += ", ";
-        if (dateToWeek.day < 10) Value += "0";
-        Value += dateToWeek.day;
-        Value += ".";
-        if (dateToWeek.month < 10) Value += "0";
-        Value += dateToWeek.month;
-        
-        for (byte n = 0; n < numSubjects; n++) {
-          if (!n) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", Value));
-          else valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
-        }
-
-        prev = true;
-      }
-
-      FirebaseJson rowObject;
-      rowObject.set("values", valuesArray);
-
-      FirebaseJsonArray rowsArray;
-      rowsArray.add(rowObject);
-
-      request.set("updateCells/rows", rowsArray);
-      request.set("updateCells/fields", "userEnteredValue");
-      requests.add(request);
-      request.clear();
-
-      if (!MemControl.check()) {
-        bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
-        requests.clear();
-        request.clear();
-      }
-      //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
-
-
-      serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String(MemControl.getDiff()/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
-
-      FirebaseJson response;
-      bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
-      
-
-      response.clear();
+    if (!MemControl.check()) {
+      bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
       requests.clear();
     }
+    //---------------------------------------------------------Сopy-Paste запрос---------------------------------------------------------
+
+
+
+    //------------------------------------------------------Запрос очистки диапазона------------------------------------------------------
+    request.set("repeatCell/range/sheetId", SHEET_ID);
+
+    request.set("repeatCell/range/startRowIndex", (people_list_i + (offset * (week_off + iter))) - 1);
+    request.set("repeatCell/range/endRowIndex", (people_list_i + (offset * (week_off + iter)) + sizeof(students)/sizeof(students[0]) - 1));
+    request.set("repeatCell/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
+    request.set("repeatCell/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), settings.table_width[iter % 2 == 0])));
+
+    request.set("repeatCell/cell/userEnteredValue/stringValue", "");
+    request.set("repeatCell/fields", "userEnteredValue");
+
+    requests.add(request);
+    request.clear();
+
+    if (!MemControl.check()) {
+      bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
+      requests.clear();
+    }
+    //------------------------------------------------------Запрос очистки диапазона------------------------------------------------------
+
+
+
+    //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
+    FirebaseJsonArray valuesArray;
+
+    request.set("updateCells/range/sheetId", SHEET_ID);
+    
+    request.set("updateCells/range/startRowIndex", (weekInfo_i + (offset * (week_off + iter)) - 1));
+    request.set("updateCells/range/endRowIndex", (weekInfo_i + (offset * (week_off + iter))));
+    request.set("updateCells/range/startColumnIndex", columnLetterToIndex(charOffset(String(weekInfo_c), 1)));
+    request.set("updateCells/range/endColumnIndex", columnLetterToIndex(charOffset(String(less_num_c), settings.table_width[iter % 2 == 0])));
+
+    String Value = "";
+    bool prev = false;
+
+    for (byte j = 0; j < 7; j++) {     
+      byte numSubjects = 0;               //введем для читаемости в отдельную переменную
+
+      if (iter % 2 != 0) numSubjects = week[0]->subj_num[j];
+      else  numSubjects = week[1]->subj_num[j];   
+
+      if (!numSubjects) {
+        sumDate(&dateToWeek, 1);      //+1, т.к. переходим к следующему дню
+        continue;             //если пар в этот день нет - пропускаем
+      }
+
+      if (prev) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
+        
+      sumDate(&dateToWeek, 1);
+
+      Value = DaysOfWeek[j];                                               //день недели
+      Value += ", ";
+      if (dateToWeek.day < 10) Value += "0";
+      Value += dateToWeek.day;
+      Value += ".";
+      if (dateToWeek.month < 10) Value += "0";
+      Value += dateToWeek.month;
+      
+      for (byte n = 0; n < numSubjects; n++) {
+        if (!n) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", Value));
+        else valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
+      }
+
+      prev = true;
+    }
+
+    FirebaseJson rowObject;
+    rowObject.set("values", valuesArray);
+
+    FirebaseJsonArray rowsArray;
+    rowsArray.add(rowObject);
+
+    request.set("updateCells/rows", rowsArray);
+    request.set("updateCells/fields", "userEnteredValue");
+    requests.add(request);
+    request.clear();
+
+    if (!MemControl.check()) {
+      bot.sendMessage("Достроение недель прервано! Нехватка RAM!", error_chat);
+      requests.clear();
+      request.clear();
+    }
+    //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
+
+
+    serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String(MemControl.getDiff()/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
+
+    FirebaseJson response;
+    bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");
+    
+
+    response.clear();
+    requests.clear();
   }
   
   //---------------------------------------------------Дорисовываем недостающие недели---------------------------------------------------
@@ -241,27 +201,21 @@
   week_file.update();
 
   if (weeksToBuild % 2 != 0) {                  //тогда меняем местами указатели. Настоящаая четность поменялась
-    for (byte x = 0; x < 2; x++) {
-      WeekInfo *temp = week[x];
-      week[x] = week[x + 2];
-      week[x + 2] = temp;
-    }
+    WeekInfo *temp = week[0];
+    week[0] = week[1];
+    week[1] = temp;
   }
 
   sumDate(&dateToWeek, -6);
 
-  for (byte k = 0; k < 2; k++) {                //делаем pon_day и pon_month актуальными под последние недели. Какая то сложная схема, мб нужно переделать на что то попроще или вообще без цикла
-    if (k) sumDate(&dateToWeek, -7);
-    week[0+2*k]->pon_date.day = dateToWeek.day;
-    week[1+2*k]->pon_date.day = dateToWeek.day;
-    week[0+2*k]->pon_date.month = dateToWeek.month;
-    week[1+2*k]->pon_date.month = dateToWeek.month;
-  }
+  week[0]->pon_date = dateToWeek;               //делаем pon_day и pon_month актуальными под последние недели
+  sumDate(&dateToWeek, -7);
+  week[1]->pon_date = dateToWeek;
   
   return weeksToBuild;
-}*/
+}
 
-uint16_t columnLetterToIndex(const String& col) {         //конвертация буквенной части адреса ячейки в абсолютное числовое значение (такой формат требует batchUpdate)
+uint16_t columnLetterToIndex(const String& col) {         //  конвертация буквенной части адреса ячейки в абсолютное числовое значение (такой формат требует batchUpdate)
   uint16_t result = 0;
   for (uint16_t i = 0; i < col.length(); ++i) {
     char c = toupper(col[i]);
@@ -271,21 +225,27 @@ uint16_t columnLetterToIndex(const String& col) {         //конвертаци
   return result - 1;
 }
 
-void sumDate(Date *date, int day_offset) {              //функция суммирования (как в плюс, так и в минус) структуры Date с неким числом дней. Изменяет напрямую переданный обьект
+void sumDate(Date *date, int day_offset) {               // функция суммирования (как в плюс, так и в минус) структуры Date с неким числом дней. Изменяет напрямую переданный обьект
   int total_day = date->day + day_offset;
 
   // Прибавление дней
-  while (total_day > day_month[(date->month - 1) % 12]) {           //даже с проверкой перехода нового года
-    total_day -= day_month[(date->month - 1) % 12];
+  while (total_day > getDayInMonth(date->month-1, date->year)) {
+    total_day -= getDayInMonth(date->month-1, date->year);
     date->month++;
-    if (date->month > 12) date->month = 1;
+    if (date->month > 12) {
+      date->month = 1;
+      date->year++;
+    }
   }
 
   // Вычитание дней
   while (total_day <= 0) {
     date->month--;
-    if (date->month < 1) date->month = 12;
-    total_day += day_month[(date->month - 1) % 12];
+    if (date->month < 1) {
+      date->month = 12;
+      date->year--;
+    }
+    total_day += getDayInMonth(date->month-1, date->year);
   }
 
   date->day = total_day;

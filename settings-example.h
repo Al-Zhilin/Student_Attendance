@@ -13,9 +13,7 @@
 #define OTA_NAME ""                                                                              //имя для OTA
 #define OTA_PASS ""                                                                              //пароль для OTA
 #define GROUP_COMMANDER ""                                                                       //юзернейм старосты
-#define SHEET1_ID _                                                                              //id первого листа
-#define SHEET2_ID _                                                                              //id второго листа
-
+#define SHEET_ID _                                                                               //id листа
 //---------------------------------Ключи и id для доступа к таблице---------------------------------
 
 
