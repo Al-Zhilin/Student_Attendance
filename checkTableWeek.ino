@@ -1,10 +1,9 @@
 int8_t checkTableWeek() {            //функция проверки и достроения недель в Google Sheet
-
   realTime = bot.getTime(3);         //обновили время
   serviceMess.edit("Проверяю актуальность недели в таблице...");
 
   if (!bot.timeSynced()) {
-    bot.sendMessage(F("Структура реального времени еше не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
+    bot.sendMessage(F("Структура реального времени еще не подтянулась!\nНевозможно дополнить таблицу новыми неделями!"), error_chat);
     timer.add(bot.lastBotMsg(), 10, error_chat);
     return -1;
   }
@@ -13,36 +12,20 @@ int8_t checkTableWeek() {            //функция проверки и дос
   Date dateToWeek(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
   sumDate(&dateToWeek, realTime.dayWeek-1);                        //временно сравняем дни недели реальной даты и последней недели в таблице, чтобы сделать все расчеты кратнымии и тем самым сильно упростить их
 
-  byte weeksToBuild = 0;
-
-  if (dateToWeek.month == realTime.month) {       // если месяцы одинаковые
-    if (realTime.day == dateToWeek->day) {                  // еще и дни совпали
-      serviceMess.edit("В таблице записана актуальная неделя!", 5000);
-      return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!
-    }
-
-    else {
-      weeksToBuild = (realTime.day - dateToWeek->day) / 7;      //количество недель, которые нужно достроить
-    }
+  int days_between = StampUtils::dateToDays2000(realTime.day, realTime.month, realTime.year) - StampUtils::dateToDays2000(dateToWeek.day, dateToWeek.month, dateToWeek.year);         // разница в днях
+  if (days_between == 0) {
+    serviceMess.edit("В таблице записана актуальная неделя!", 5000);
+    return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!
   }
 
-  else {
-    int days_between = getDayInMonth(dateToWeek.month-1, dateToWeek.year) - dateToWeek.day;                  // сначала остаток дней до конца "вытянутого" месяца
+  byte weeksToBuild = days_between / 7;
 
-    for (byte i = dateToWeek.month; i < realTime.month - 1; i++) {                                                  // потом все целые месяцы между
-      days_between += getDayInMonth(i, dateToWeek.year);
-      //--------------------------------------------------------------- учитывать год!!!!!!!------------------------------------------------------------------------------------------------------------
-    }
-
-    days_between += realTime.day;                                                                               // а потом и часть дней, уже прошедших в текущем месяце
-    weeksToBuild = days_between / 7;
-    if (days_between % 7 != 0)  {
-      bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);         // т.к. мы ранее выравнивали вытянутую дату по дню недели с текущей, то такой остаток явно показывает ошибку в логике расчета
+  if (days_between % 7 != 0)  {           // т.к. мы ранее выравнивали вытянутую дату по дню недели с текущей, то такой остаток явно показывает ошибку в логике расчета
+      bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);
       serviceMess.edit("Достроение недель прервано в связи с некорректной работой алгоритма расчета!", 10000);
       return -1;
     }
-  }
-  
+
   if (week_off + weeksToBuild < 3) {                                        // т.к. первые 2 недели в таблице всего построены изначально - их нет смысла рисовать, просто документируем этот факт и идем пить чяй
     serviceMess.edit("В таблице записана актуальная неделя!", 5000);
     week_off += weeksToBuild;
@@ -185,7 +168,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
     //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
 
 
-    serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + ", подгруппы " + String(i+1) + "/2\n" + "Этот лист занимает " + String(MemControl.getDiff()/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
+    serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + "\n" + "Этот лист занимает " + String(MemControl.getDiff()/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
 
     FirebaseJson response;
     bool success = GSheet.batchUpdate(&response, spreadsheetId, &requests, "false", "", "false");

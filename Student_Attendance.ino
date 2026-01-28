@@ -36,7 +36,7 @@ FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));   
 FileData chat_file(&FFat, "/data.dat", 'Z', &chat_settings, sizeof(chat_settings));
 FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
-const String months[] = {               //сокращенные названия всех месяцев
+const String months[] PROGMEM = {               //сокращенные названия всех месяцев для отображения в меню
   "Янв",
   "Фев",
   "Мар",
@@ -51,10 +51,10 @@ const String months[] = {               //сокращенные названи�
   "Дек",
 };
 
-uint8_t getDayInMonth(uint8_t month, uint16_t year) {                     // year нужно для проверки высокосности февраля. Нумерация месяцев: 0...11
-  byte day_month[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+uint8_t getDayInMonth(uint8_t month, uint16_t year) {                     // year нужен для проверки високосности февраля. Нумерация месяцев: 0...11
+  byte day_month[] PROGMEM = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
   if (month == 1) return day_month[month] + ((StampUtils::isLeap(year)) ? 1 : 0);         // учитываем возможные 29 дней февраля
-  return day_month[month]
+  return day_month[month];
 }
 
 struct Date {
@@ -86,6 +86,8 @@ struct Date {
   }
 };
 
+void sumDate(Date *date, int day_offset);
+
 String PROGMEM DaysOfWeek[] = {
   "Понедельник",
   "Вторник",
@@ -96,22 +98,22 @@ String PROGMEM DaysOfWeek[] = {
   "Воскресенье",
 };
 
-struct SetInfo {      //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
+struct SetInfo {    //структура с данными, нужными для выставления/изменения конкретной Н-ки и/или массива Нок. В обоих случаях используем эту структуру
   String surn;          //фамилия человека
   String nki;           //строка, в которой каждый индекс строки обозначает тип пропуска, соответственно каждой паре выбранного дня
   Date date;            //дата выставления Нки
-  byte dayWeek;         //день недели (1-7 / понедельник-воскресенье)
+  uint8_t dayWeek;      //день недели (1-7 / понедельник-воскресенье)
   String posC;          //символьная составлющая координаты ячейки
-  int posI;             //численная составляющая координаты ячейки
+  uint16_t posI;             //численная составляющая координаты ячейки
   bool subgroup;        //подгруппа (false/true, 1/2 соответственно)
   bool parity;          //четность/нечетность (0/1 соответственно) недели, в которой ставим Нку
 } nka;
 
 struct WeekInfo {
-  Date pon_date;                  //дата понедельника этой недели
-  byte study_days = 0;            //количество учебных дней в неделе  (week_info_c; week_info_i) после /
-  byte subj_num[7] = {};          //кол-во пар в учебных днях (less_mun_c; less_num_i)......
-  byte *less_nums[7] = {};        //номера всех пар в дне
+  Date pon_date;                                     //дата понедельника этой недели
+  uint8_t study_days = 0;                            //количество учебных дней в неделе  (week_info_c; week_info_i) после /
+  uint8_t subj_num[7] = {};                          //кол-во пар в учебных днях (less_mun_c; less_num_i)......
+  uint8_t less_nums[7][MAX_LESSONS_IN_DAY] = {};      //номера всех пар в дне
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
 
 } week_object[2];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
@@ -313,8 +315,8 @@ class Sheet {
           String firstDayName = cell.stringValue.substring(0, cell.stringValue.indexOf(","));      // имя первого дня этой недели (может быть не понедельник)
           String rawDate = cell.stringValue.substring(cell.stringValue.indexOf(",")+1);            // дата в сыром формате: в строке, возможны разные представления: 1.2, 12.2, 1.12, 12.11
           
-          uint8_t firstDot = rawDate.indexOf(".");
-          uint8_t secondDot = rawDate.lastIndexOf(".");
+          int8_t firstDot = rawDate.indexOf(".");
+          int8_t secondDot = rawDate.lastIndexOf(".");
 
           if (firstDot != -1 && secondDot != -1 && firstDot != secondDot) {                        // условие корректности формата даты в ячейке (X.Y.Z)
             week[i]->pon_date.day = rawDate.substring(0, firstDot).toInt();
@@ -342,50 +344,101 @@ class Sheet {
             else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_date.day-=5;
             else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_date.day-=6;
             else {
-              bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"!\n\nОтвет от Sheet: \"" + answer.toString() + "\"", Admins[0]);
+              bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName, error_chat);
             }
           }
         }
 
-        else bot.sendMessage(F("Ошибка парсинга даты и имени первого учебного дня недели!"), error_chat);
+        else bot.sendMessage(F("Ошибка получения даты и имени первого учебного дня недели!"), error_chat);
         //----------------------Дата понедельника этой недели---------------------------
 
 
         //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
-        // Формируем: week[i]->study_days                   кол-во учебных дней
-        //            week[i]->subj_num[7]                  количество пар в каждый день
-        //            week[i]->less_nums[7][realloc]        номера всех пар в каждый день
+        // Формируем: week[i]->study_days                               кол-во учебных дней
+        //            week[i]->subj_num[7]                              количество пар в каждый день
+        //            week[i]->less_nums[7][MAX_LESSON_IN_DAY]          номера всех пар в каждый день
         uint8_t real_width = 0;
-
         range = SheetName;
-        range += less_name_c;
-        range += less_name_i;
+        range += less_num_c;
+        range += less_num_i;
         range += ":";
-        range += charOffset(String(less_name_c), settings.table_width);           // после первого чтения новой таблицы система запомнит ее ширину и будет гарантированно укладываться в один запрос
-        range += less_name_i;
+        range += charOffset(String(less_name_c), settings.table_width[i]+2);           // после первого чтения новой таблицы система запомнит ее ширину и будет гарантированно укладываться в один запрос
+        range += less_name_i;                                                          // +2 нужно, чтобы понимать, что конец прочитанного диапазона - реально конец недели (ищем 2 пустые ячейки подряд)
 
         this->getCells(returned_json, range);                // получаем данные
         String adasd = "";
-        returned_json.toString(adasd);
-        bot.sendMessage(adasd, error_chat);
+        returned_json.toString(adasd, true);
+        
+        char path[20];
+        uint8_t current_day = 0, current_lesson = 0;         // значения текущих используемых индексов в массиве дней и занаятий, который сейчас заполняем
+        uint8_t read_offset = 0;                             // переменная для сдвига диапазона читаемой таблицы
+        bool empty_prev = false;                             // показывает, была ли предыдущая ячейка пустой
 
-        /*char path = "values/[0]/[0]";
-        for (uint8_t path_iter = 0; path_iter < settings.table_width; path_iter++) {
-          path[12] = static_cast<char>(path_iter);
+        for (int8_t path_iter = 0; path_iter < settings.table_width[i]; path_iter++) {             //+2 нужно чтобы корректно захватить 2 пустые строки после окончания недель
+          snprintf(path, sizeof(path), "values/[0]/[%d]", path_iter);
           FirebaseJsonData cell;
           returned_json.get(cell, path);
-        }*/
+
+          real_width++;
+          
+          if (cell.stringValue == "") {
+            if (empty_prev) break;             // два пропуска подряд, значит дни закончились!
+
+            empty_prev = true;
+            week[i]->study_days++;
+            if (++current_day > 6) {
+              bot.sendMessage(F("Форматирование таблицы соответствует некорректному значению дней в неделе!"), error_chat);
+              CriticalError();
+            }
+            current_lesson = 0;
+            if (path_iter != settings.table_width[i]+1) continue;
+          }
+
+          else {
+            empty_prev = false;                 // если нашли данные - сбрасываем флаг пустой ячейки
+
+            week[i]->subj_num[current_day]++;                                       // кол-во пар в каждый день
+            week[i]->less_nums[current_day][current_lesson] = cell.intValue;        // номера каждой пары в каждый день
+
+            if (++current_lesson >= MAX_LESSONS_IN_DAY) {
+              bot.sendMessage("Количество пар в " + DaysOfWeek[current_day] + " превышает установленный лимит! Измените настройки!", error_chat);
+              CriticalError();
+            }
+          }
+          if (path_iter == settings.table_width[i]+1) {                // если сработало это условие: мы гарантированно дошли до конца прочитанного обьема данных, но так и не нашли конец недели --> читаем еще пачку
+            range = SheetName;
+            range += charOffset(String(less_name_c), settings.table_width[i] + read_offset);
+            range += less_num_i;
+            range += ":";
+            range += charOffset(String(less_name_c), settings.table_width[i] + (read_offset += settings.table_width[i]));
+            range += less_name_i;
+
+            path_iter = -1;                               // обновили переменную, чтобы начать новый массив данных С НАЧАЛА (-1 нужно чтобы скомпенсировать path_iter++, который цикл автоматически сделает перед следующей итерацией)
+            this->getCells(returned_json, range);         // получили новые данные и продолжаем идти именно по ним
+          }
+        }
+        real_width-=2;
+
+        bot.sendMessage("Учебных дней: " + String(week[i]->study_days), error_chat);
+        bot.sendMessage("Пары в каждый день:", error_chat);
+        for (uint8_t days = 0; days < 7; days++) {
+          bot.sendMessage("Всего пар в " + String(days+1) + " день: " + String(week[i]->subj_num[days]), error_chat);
+          for (uint8_t p_days = 0; p_days < week[i]->subj_num[days]; p_days++) {
+            bot.sendMessage("----- " + String(week[i]->less_nums[days][p_days]), error_chat);
+          }
+        }
+        CriticalError();
 
         // читаем строку
         // идемм по ней с помощью функций хождения по json
-        // по алоритму заполоняем нужные нам (указанные выше) данные
+        // по алгоритму заполняем нужные нам (указанные выше) данные
         // если json кончился, а предпосылки на данные есть - читаем еще кусок фиксированной длины
         // не забываем обновлять real_width, чтобы оптимизировать процесс поиска (причем для каждой четности неделя может быть разной длины -> учитываем)
         // как только встретили 2 пустые ячейки подряд - наша остановочка (конец недели)
 
 
-        if (real_width != settings.table_width) {
-          settings.table_width = real_width;
+        if (real_width != settings.table_width[i]) {
+          settings.table_width[i] = real_width;
           settings_file.update();
         }
         //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
@@ -765,7 +818,7 @@ class Menu {
         }
 
         else if (way == "01111") {                                                         // выбор дня в месяце
-          for (int i = 1; i < day_month[nka.date.month-1]+1; i++) {
+          for (int i = 1; i < getDayInMonth(nka.date.month-1, nka.date.year)+1; i++) {
             if (comm == String(i)) {
               nka.date.day = i;
               way = "011";
@@ -1070,26 +1123,27 @@ class Menu {
             Date parsedDate;
             parsedDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0') + (realTime.dayWeek-1);         // не только парсим день, но еще и сравниваем его по дню недели с текущим днем недели, упрощает расчеты ввиду получения кратности разницы
             parsedDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+            // ДОБАВИТЬ parsedDate.year!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             byte week_diff = 0;
 
             
             int days_between;
 
             if (parsedDate.month <= realTime.month) {                             // если выбранная неделя в этом, или в одном из прошлый месяцев
-              days_between = day_month[parsedDate.month - 1] - parsedDate.day;
+              days_between = getDayInMonth(parsedDate.month - 1, parsedDate.year) - parsedDate.day;
 
               for (byte i = parsedDate.month; i < realTime.month - 1; i++) {
-                days_between += day_month[i];
+                days_between += getDayInMonth(i, realTime.year);                      // ЗДЕСЬ ПОКА ЗАГЛУШКА!!!! ПЕРЕДЕЛАТЬ ЧЕРЕЗ КОЛ-ВО ДНЕЙ ОТ 01.01.2000
               }
 
               days_between += realTime.day;
             }
             
             else {                                                               // если выбранная неделя в будущем месяце (месяцах)
-              days_between = day_month[realTime.month - 1] - realTime.day;
+              days_between = getDayInMonth(realTime.month-1, realTime.year) - realTime.day;
 
               for (byte i = realTime.month; i < parsedDate.month - 1; i++) {
-                days_between += day_month[i];
+                days_between += getDayInMonth(i, realTime.year);                       // ЗДЕСЬ ПОКА ЗАГЛУШКА!!!! ПЕРЕДЕЛАТЬ ЧЕРЕЗ КОЛ-ВО ДНЕЙ ОТ 01.01.2000
               }
 
               days_between += parsedDate.day;
@@ -1126,7 +1180,7 @@ class Menu {
         break;
 
         case 1: {
-          String range = "", answ;
+          /*String range = "", answ;
           mess = nka.surn;
           mess += "\t";
           mess += nka.subgroup+1;
@@ -1138,8 +1192,7 @@ class Menu {
           if (nka.date.month < 10) mess += "0";
           mess += nka.date.month;
           mess += ".";
-          mess += nka.date.year[2];
-          mess += nka.date.year[3];
+          mess += nka.date.year % 100;
           mess += "\n";
           getNIndex();
           byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);                               //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
@@ -1181,7 +1234,7 @@ class Menu {
             mess += "В этот день пар нет!\n";
             mess += "Назад\tНа главную";
           }
-          reading_flag = true;
+          reading_flag = true;*/
         }
         break;
 
@@ -1399,7 +1452,7 @@ class Menu {
         case 1: {
           mess = "Нажмите для обозначения границ:\n";
           mess += "Назад\tГотово\tНа главную\n";  
-          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year), date_end(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date->year);
+          Date date_start(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year), date_end(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
           sumDate(&date_end, 6);
 
           for (byte i = 0; i < week_off; i++) {
