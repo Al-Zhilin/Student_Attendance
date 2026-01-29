@@ -363,7 +363,7 @@ class Sheet {
         range += less_num_i;
         range += ":";
         range += charOffset(String(less_name_c), settings.table_width[i]+2);           // после первого чтения новой таблицы система запомнит ее ширину и будет гарантированно укладываться в один запрос
-        range += less_name_i;                                                          // +2 нужно, чтобы понимать, что конец прочитанного диапазона - реально конец недели (ищем 2 пустые ячейки подряд)
+        range += less_num_i;                                                           // +2 нужно, чтобы понимать, что конец прочитанного диапазона - реально конец недели (ищем 2 пустые ячейки подряд)
 
         this->getCells(returned_json, range);                // получаем данные
         String adasd = "";
@@ -371,10 +371,10 @@ class Sheet {
         
         char path[20];
         uint8_t current_day = 0, current_lesson = 0;         // значения текущих используемых индексов в массиве дней и занаятий, который сейчас заполняем
-        uint8_t read_offset = 0;                             // переменная для сдвига диапазона читаемой таблицы
+        uint8_t read_offset = 2;                             // переменная для сдвига диапазона читаемой таблицы
         bool empty_prev = false;                             // показывает, была ли предыдущая ячейка пустой
 
-        for (int8_t path_iter = 0; path_iter < settings.table_width[i]; path_iter++) {             //+2 нужно чтобы корректно захватить 2 пустые строки после окончания недель
+        for (int8_t path_iter = 0; path_iter < settings.table_width[i]+2; path_iter++) {             //+2 нужно чтобы корректно захватить 2 пустые строки после окончания недель
           snprintf(path, sizeof(path), "values/[0]/[%d]", path_iter);
           FirebaseJsonData cell;
           returned_json.get(cell, path);
@@ -386,32 +386,34 @@ class Sheet {
 
             empty_prev = true;
             week[i]->study_days++;
-            if (++current_day > 6) {
-              bot.sendMessage(F("Форматирование таблицы соответствует некорректному значению дней в неделе!"), error_chat);
-              CriticalError();
-            }
             current_lesson = 0;
             if (path_iter != settings.table_width[i]+1) continue;
           }
 
           else {
+            if (empty_prev) {             // если после пробела есть новые данные -> значит начался новый день
+              if (++current_day > 6) {
+                bot.sendMessage(F("Форматирование таблицы соответствует некорректному значению дней в неделе!"), error_chat);
+                CriticalError();
+              }
+            }
             empty_prev = false;                 // если нашли данные - сбрасываем флаг пустой ячейки
 
-            week[i]->subj_num[current_day]++;                                       // кол-во пар в каждый день
-            week[i]->less_nums[current_day][current_lesson] = cell.intValue;        // номера каждой пары в каждый день
-
-            if (++current_lesson >= MAX_LESSONS_IN_DAY) {
-              bot.sendMessage("Количество пар в " + DaysOfWeek[current_day] + " превышает установленный лимит! Измените настройки!", error_chat);
+            if (current_lesson >= MAX_LESSONS_IN_DAY) {
+              bot.sendMessage("Количество пар в \"" + DaysOfWeek[current_day] + "\" превышает установленный лимит! Измените настройки!", error_chat);
               CriticalError();
             }
+
+            week[i]->subj_num[current_day]++;                                       // кол-во пар в каждый день
+            week[i]->less_nums[current_day][current_lesson++] = cell.intValue;        // номера каждой пары в каждый день
           }
           if (path_iter == settings.table_width[i]+1) {                // если сработало это условие: мы гарантированно дошли до конца прочитанного обьема данных, но так и не нашли конец недели --> читаем еще пачку
             range = SheetName;
             range += charOffset(String(less_name_c), settings.table_width[i] + read_offset);
             range += less_num_i;
             range += ":";
-            range += charOffset(String(less_name_c), settings.table_width[i] + (read_offset += settings.table_width[i]));
-            range += less_name_i;
+            range += charOffset(String(less_name_c), settings.table_width[i] + (read_offset += settings.table_width[i]+2));
+            range += less_num_i;
 
             path_iter = -1;                               // обновили переменную, чтобы начать новый массив данных С НАЧАЛА (-1 нужно чтобы скомпенсировать path_iter++, который цикл автоматически сделает перед следующей итерацией)
             this->getCells(returned_json, range);         // получили новые данные и продолжаем идти именно по ним
@@ -448,7 +450,7 @@ class Sheet {
     }
 
 
-      void getCells(FirebaseJson &answ, const String &range) {                 // функция получения Нок из таблицы (чтобы в меню отображать)
+      void getCells(FirebaseJson &answ, const String &range) {                 // функция получения данных из таблицы
         byte tries = 0;
         answ.clear();
         while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
