@@ -33,7 +33,7 @@ struct fileData {                                                 // струк�
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
 byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
 FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));   // ЗДЕСЬ ТОЖЕ НЕ ТРОГАТЬ!!
-FileData chat_file(&FFat, "/data.dat", 'Z', &chat_settings, sizeof(chat_settings));
+FileData chat_file(&FFat, "/data.dat", 'V', &chat_settings, sizeof(chat_settings));
 FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
 const String months[] PROGMEM = {               //сокращенные названия всех месяцев для отображения в меню
@@ -335,18 +335,9 @@ class Sheet {
             CriticalError();
           }
           
-
-          if (firstDayName != "понедельник" && firstDayName != "Понедельник") {                  //непонятно, нужна ли эта фигня №2       !!!Переделать с помощью enum дней недели!!!
-            if (firstDayName == "вторник" || firstDayName == "Вторник")  week[i]->pon_date.day--;
-            else if (firstDayName == "среда" || firstDayName == "Среда") week[i]->pon_date.day-=2;
-            else if (firstDayName == "четверг" || firstDayName == "Четверг") week[i]->pon_date.day-=3;
-            else if (firstDayName == "пятница" || firstDayName == "Пятница") week[i]->pon_date.day-=4;
-            else if (firstDayName == "суббота"  || firstDayName == "Суббота") week[i]->pon_date.day-=5;
-            else if (firstDayName == "воскресенье" || firstDayName == "Воскресенье") week[i]->pon_date.day-=6;
-            else {
-              bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName, error_chat);
-            }
-          }
+          bool days_found = false;
+          if (firstDayName != DaysOfWeek[0]) for (uint8_t daysInWeek = 1; daysInWeek < 7; daysInWeek++) if (firstDayName == DaysOfWeek[daysInWeek] && (days_found = true)) sumDate(&week[i]->pon_date, -(daysInWeek));  // оппаааа, красивая фишечка для флага, да?
+          if (!days_found)  bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName, error_chat);
         }
 
         else bot.sendMessage(F("Ошибка получения даты и имени первого учебного дня недели!"), error_chat);
@@ -378,10 +369,12 @@ class Sheet {
           snprintf(path, sizeof(path), "values/[0]/[%d]", path_iter);
           FirebaseJsonData cell;
           returned_json.get(cell, path);
+          String cell_value = cell.stringValue;
+          cell_value.replace(" ", "");                // защита от невидимого косяка
 
           real_width++;
           
-          if (cell.stringValue == "") {
+          if (cell_value == "") {
             if (empty_prev) break;             // два пропуска подряд, значит дни закончились!
 
             empty_prev = true;
@@ -421,32 +414,23 @@ class Sheet {
         }
         real_width-=2;
 
-        bot.sendMessage("Учебных дней: " + String(week[i]->study_days), error_chat);
+        /*bot.sendMessage("Учебных дней: " + String(week[i]->study_days), error_chat);                                             //Для отладки!
         bot.sendMessage("Пары в каждый день:", error_chat);
         for (uint8_t days = 0; days < 7; days++) {
           bot.sendMessage("Всего пар в " + String(days+1) + " день: " + String(week[i]->subj_num[days]), error_chat);
           for (uint8_t p_days = 0; p_days < week[i]->subj_num[days]; p_days++) {
             bot.sendMessage("----- " + String(week[i]->less_nums[days][p_days]), error_chat);
           }
-        }
-        CriticalError();
-
-        // читаем строку
-        // идемм по ней с помощью функций хождения по json
-        // по алгоритму заполняем нужные нам (указанные выше) данные
-        // если json кончился, а предпосылки на данные есть - читаем еще кусок фиксированной длины
-        // не забываем обновлять real_width, чтобы оптимизировать процесс поиска (причем для каждой четности неделя может быть разной длины -> учитываем)
-        // как только встретили 2 пустые ячейки подряд - наша остановочка (конец недели)
-
+        }*/
 
         if (real_width != settings.table_width[i]) {
           settings.table_width[i] = real_width;
-          settings_file.update();
+          settings_file.updateNow();
         }
         //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
       }
       
-      //checkTableWeek();                                                 //проверяем неделю на актуальность
+      checkTableWeek();                                                 //проверяем неделю на актуальность
     }
 
 
@@ -1622,9 +1606,9 @@ void setup() {
   bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
 
   menu.start_page(0, file_stat);       // чисто для обновления структуры FB_Time
+  bot.sendMessage("11", error_chat);
   list.begin();
   menu.start_page(1, file_stat);       // вот тут уже отсылаем менюшку
-  bot.sendMessage("Запускаюсь!!", error_chat);
 }
 
 void loop() {

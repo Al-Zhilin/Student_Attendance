@@ -9,8 +9,9 @@ int8_t checkTableWeek() {            //функция проверки и дос
   }
 
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
-  Date dateToWeek(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
-  sumDate(&dateToWeek, realTime.dayWeek-1);                        //временно сравняем дни недели реальной даты и последней недели в таблице, чтобы сделать все расчеты кратнымии и тем самым сильно упростить их
+  Date dateToWeek(week[week_off == 1]->pon_date.day, week[week_off == 1]->pon_date.month, week[week_off == 1]->pon_date.year);    // Вопросы к индексу? Разбирайся с логикой построки для случая начала семестра:
+                                                                                                                                  // 1 и !2! недели построены по умолчанию, но этот факт нам же нужно указать, для корректности увеличения даты в 3 и далее неделе
+  sumDate(&dateToWeek, realTime.dayWeek-1);                        //временно сравняем дни недели реальной даты и последней недели в таблице, чтобы сделать все расчеты кратными и тем самым сильно упростить их
 
   int days_between = StampUtils::dateToDays2000(realTime.day, realTime.month, realTime.year) - StampUtils::dateToDays2000(dateToWeek.day, dateToWeek.month, dateToWeek.year);         // разница в днях
   if (days_between == 0) {
@@ -105,7 +106,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
 
 
 
-    //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
+    //-----------------------------------------------Запрос для обновления дат в заголовках дней-----------------------------------------------
     FirebaseJsonArray valuesArray;
 
     request.set("updateCells/range/sheetId", SHEET_ID);
@@ -140,6 +141,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
       Value += ".";
       if (dateToWeek.month < 10) Value += "0";
       Value += dateToWeek.month;
+      Value += ".";
+      Value += dateToWeek.year;
       
       for (byte n = 0; n < numSubjects; n++) {
         if (!n) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", Value));
@@ -165,7 +168,7 @@ int8_t checkTableWeek() {            //функция проверки и дос
       requests.clear();
       request.clear();
     }
-    //-----------------------------------------------Запрос обновления дат в заголовках дней-----------------------------------------------
+    //-----------------------------------------------Запрос для обновления дат в заголовках дней-----------------------------------------------
 
 
     serviceMess.edit("Достраиваю неделю " + String(iter+1) + "/" + String(weeksToBuild) + "\n" + "Этот лист занимает " + String(MemControl.getDiff()/1024) + " кБ в RAM\nВсего - " + String(ESP.getHeapSize()/1024) + " кБ, Свободно - " + String(ESP.getFreeHeap()/1024) + " кБ");
@@ -194,7 +197,9 @@ int8_t checkTableWeek() {            //функция проверки и дос
   week[0]->pon_date = dateToWeek;               //делаем pon_day и pon_month актуальными под последние недели
   sumDate(&dateToWeek, -7);
   week[1]->pon_date = dateToWeek;
-  
+
+  CriticalError();
+
   return weeksToBuild;
 }
 
