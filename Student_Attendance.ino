@@ -111,12 +111,23 @@ struct SetInfo {    //структура с данными, нужными дл�
 
 struct WeekInfo {
   Date pon_date;                                     //дата понедельника этой недели
-  uint8_t study_days = 0;                            //количество учебных дней в неделе  (week_info_c; week_info_i) после /
-  uint8_t subj_num[7] = {};                          //кол-во пар в учебных днях (less_mun_c; less_num_i)......
-  uint8_t less_nums[7][MAX_LESSONS_IN_DAY] = {};      //номера всех пар в дне
-  bool parity;             //четная/нечетная (true/false соответственно) эта неделя  (week_info_c; week_info_i) перед /
+  uint8_t study_days[2] = 0;                            //количество учебных дней в неделе у 2х подгрупп
+  uint8_t subj_num[2][7] = {};                          //кол-во пар в учебных днях у 2х подгрупп
+  uint8_t* less_nums[2][7];                            //номера всех пар в дне у 2х подгрупп
+  bool parity;             //четная/нечетная (true/false соответственно) эта неделя
+  
+  WeekInfo() {
+        for (uint8_t week = 0; week < 2; week++) {
+            for (uint8_t days = 0; days < 7; days++) {
+                less_nums[g][d] = (uint8_t*)malloc(MAX_LESSON_IN_DAY * sizeof(uint8_t));
+            }
+        }
+  }
 
-} week_object[2];      //0 - неделя у 1 подгруппы, 1 - неделя 2 подгруппы
+  // деструктор в этой структуре необязателен, т.к. она будет существовать на всем протяжении работы программы, а при выключении питания ESP32 SRAM (энергозависимая!!!) самоочиститься, а при перезагрузке - менеджер памяти 
+  // переразметит кучу, тем самым, по факту, затрет/инвалидирует все выделенные в ней старые данные. 
+
+} week_object[2];      //0 - текущая неделя, 1 - противоположная по четности
 
 WeekInfo *week[2] = {&week_object[0], &week_object[1]};           //week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели. Такое объявление нужно для удобного свайпа указателей при смене четности
 
@@ -345,41 +356,45 @@ class Sheet {
 
 
         //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
-        // Формируем: week[i]->study_days                               кол-во учебных дней
-        //            week[i]->subj_num[7]                              количество пар в каждый день
-        //            week[i]->less_nums[7][MAX_LESSON_IN_DAY]          номера всех пар в каждый день
+        // Формируем: week[i]->study_days[2]                               кол-во учебных дней
+        //            week[i]->subj_num[2][7]                              количество пар в каждый день
+        //            week[i]->less_nums[2][7][MAX_LESSON_IN_DAY]          номера всех пар в каждый день
         uint8_t real_width = 0;
         range = SheetName;
         range += less_num_c;
         range += less_num_i;
         range += ":";
         range += charOffset(String(less_name_c), settings.table_width[i]+2);           // после первого чтения новой таблицы система запомнит ее ширину и будет гарантированно укладываться в один запрос
-        range += less_num_i;                                                           // +2 нужно, чтобы понимать, что конец прочитанного диапазона - реально конец недели (ищем 2 пустые ячейки подряд)
+        range += less_name_i;                                                           // +2 нужно, чтобы понимать, что конец прочитанного диапазона - реально конец недели (ищем 2 пустые ячейки подряд)
 
         this->getCells(returned_json, range);                // получаем данные
         String adasd = "";
         returned_json.toString(adasd, true);
         
         char path[20];
-        uint8_t current_day = 0, current_lesson = 0;         // значения текущих используемых индексов в массиве дней и занаятий, который сейчас заполняем
-        uint8_t read_offset = 2;                             // переменная для сдвига диапазона читаемой таблицы
-        bool empty_prev = false;                             // показывает, была ли предыдущая ячейка пустой
+        uint8_t current_day = 0, current_lesson[2] = {};          // значения текущих используемых индексов в массиве дней и занаятий, который сейчас заполняем
+        uint8_t read_offset = 2;                                  // переменная для сдвига диапазона читаемой таблицы
+        bool empty_prev = false;                                  // показывает, была ли предыдущая ячейка пустой
 
         for (int8_t path_iter = 0; path_iter < settings.table_width[i]+2; path_iter++) {             //+2 нужно чтобы корректно захватить 2 пустые строки после окончания недель
+          FirebaseJsonData number_cell, subjects_cell;
           snprintf(path, sizeof(path), "values/[0]/[%d]", path_iter);
-          FirebaseJsonData cell;
-          returned_json.get(cell, path);
-          String cell_value = cell.stringValue;
-          cell_value.replace(" ", "");                // защита от невидимого косяка
+          returned_json.get(number_cell, path);                                      // получили ячейку с номером пары
+          snprintf(path, sizeof(path), "values/[1]/[%d]", path_iter);
+          returned_json.get(subjects_cell, path);                                  // получили ячейку с предметом(-ами) под соответствующим номером пары
+
+          String number = number_cell.stringValue, subjects = subjects_cell.stringValue;            // ячейки в строки для удобства работы
+          number.replace(" ", "");                // защита от невидимого косяка
+          subjects.replace(" ", "");               // и здесь
 
           real_width++;
           
-          if (cell_value == "") {
+          if (number == "") {
             if (empty_prev) break;             // два пропуска подряд, значит дни закончились!
 
             empty_prev = true;
-            week[i]->study_days++;
-            current_lesson = 0;
+            for (uint8_t k = 0; k < 2; k++) if (week[i]->subj_num[k][current_day]) week[i]->study_days[k]++;       // если в предыдущем дне были пары у подгруппы -> записываем его в счетчик
+            current_lesson[0] = current_lesson[1] = 0;
             if (path_iter != settings.table_width[i]+1) continue;
           }
 
@@ -392,13 +407,27 @@ class Sheet {
             }
             empty_prev = false;                 // если нашли данные - сбрасываем флаг пустой ячейки
 
-            if (current_lesson >= MAX_LESSONS_IN_DAY) {
-              bot.sendMessage("Количество пар в \"" + DaysOfWeek[current_day] + "\" превышает установленный лимит! Измените настройки!", error_chat);
+            if (current_lesson[0] >= MAX_LESSONS_IN_DAY || current_lesson[1] >= MAX_LESSONS_IN_DAY) {
+              bot.sendMessage("Количество пар в \"" + DaysOfWeek[current_day] + "\" у одной из подгрупп превышает установленный лимит! Измените настройки!", error_chat);
               CriticalError();
             }
 
-            week[i]->subj_num[current_day]++;                                       // кол-во пар в каждый день
-            week[i]->less_nums[current_day][current_lesson++] = cell.intValue;        // номера каждой пары в каждый день
+            uint8_t subgr_lesson = 0;           // 0 - пара есть у обоих подгрупп, 1 - только у 1, 2 - только у второй
+            if (subjects.indexOf("/") != -1) {                         // если символ "/" наличествует в наличии
+              if (subjects.startsWith("/")) subgr_lesson = 2;          // если строка с него начинается - пара есть только у второй подгруппы
+              else if (subjects.endsWith("/"))  subgr_lesson = 1;      // если на нем заканчивается - пара только в первой подгруппы
+            }
+
+            if (!subgr_lesson || subgr_lesson == 1) {                  // для первой подгруппы 
+              week[i]->subj_num[0][current_day]++;
+              week[i]->less_nums[current_day][current_lesson[0]++] = number.intValue;        // номера каждой пары в каждый день
+            }
+
+            if (!subgr_lesson || subgr_lesson == 2) {                  // для второй подгруппы
+              week[i]->subj_num[1][current_day]++;
+              week[i]->less_nums[current_day][current_lesson[1]++] = number.intValue;        // номера каждой пары в каждый день
+            }
+            
           }
           if (path_iter == settings.table_width[i]+1) {                // если сработало это условие: мы гарантированно дошли до конца прочитанного обьема данных, но так и не нашли конец недели --> читаем еще пачку
             range = SheetName;
@@ -406,7 +435,7 @@ class Sheet {
             range += less_num_i;
             range += ":";
             range += charOffset(String(less_name_c), settings.table_width[i] + (read_offset += settings.table_width[i]+2));
-            range += less_num_i;
+            range += less_name_i;
 
             path_iter = -1;                               // обновили переменную, чтобы начать новый массив данных С НАЧАЛА (-1 нужно чтобы скомпенсировать path_iter++, который цикл автоматически сделает перед следующей итерацией)
             this->getCells(returned_json, range);         // получили новые данные и продолжаем идти именно по ним
@@ -414,7 +443,7 @@ class Sheet {
         }
         real_width-=2;
 
-        /*bot.sendMessage("Учебных дней: " + String(week[i]->study_days), error_chat);                                             //Для отладки!
+        /*bot.sendMessage("Учебных дней: " + String(week[i]->study_days), error_chat);                                             //Раскомментировать для отладки!
         bot.sendMessage("Пары в каждый день:", error_chat);
         for (uint8_t days = 0; days < 7; days++) {
           bot.sendMessage("Всего пар в " + String(days+1) + " день: " + String(week[i]->subj_num[days]), error_chat);
@@ -422,6 +451,10 @@ class Sheet {
             bot.sendMessage("----- " + String(week[i]->less_nums[days][p_days]), error_chat);
           }
         }*/
+
+        for (uint8_t itt = 0; itt < 2; itt++) {           // своеобразный shrink to fit, чтобы не занимать лишние байты
+
+        }
 
         if (real_width != settings.table_width[i]) {
           settings.table_width[i] = real_width;

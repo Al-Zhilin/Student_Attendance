@@ -30,7 +30,7 @@ void getNIndex() {
   }
 
   if (!found) {
-    bot.sendMessage(F("GetIndex: surname not found!"), error_chat);
+    bot.sendMessage(F("GetNIndex: surname not found!"), error_chat);
     timer.add(bot.lastBotMsg(), 20, error_chat);
   }
 
