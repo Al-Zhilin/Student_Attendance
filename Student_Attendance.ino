@@ -117,11 +117,11 @@ struct WeekInfo {
   bool parity;             //четная/нечетная (true/false соответственно) эта неделя
   
   WeekInfo() {
-        for (uint8_t week = 0; week < 2; week++) {
-            for (uint8_t days = 0; days < 7; days++) {
-                less_nums[g][d] = (uint8_t*)malloc(MAX_LESSON_IN_DAY * sizeof(uint8_t));
-            }
+    for (uint8_t week = 0; week < 2; week++) {
+        for (uint8_t days = 0; days < 7; days++) {
+            less_nums[week][days] = (uint8_t*)malloc(MAX_LESSON_IN_DAY * sizeof(uint8_t));
         }
+    }
   }
 
   // деструктор в этой структуре необязателен, т.к. она будет существовать на всем протяжении работы программы, а при выключении питания ESP32 SRAM (энергозависимая!!!) самоочиститься, а при перезагрузке - менеджер памяти 
@@ -443,18 +443,42 @@ class Sheet {
         }
         real_width-=2;
 
-        /*bot.sendMessage("Учебных дней: " + String(week[i]->study_days), error_chat);                                             //Раскомментировать для отладки!
-        bot.sendMessage("Пары в каждый день:", error_chat);
-        for (uint8_t days = 0; days < 7; days++) {
-          bot.sendMessage("Всего пар в " + String(days+1) + " день: " + String(week[i]->subj_num[days]), error_chat);
-          for (uint8_t p_days = 0; p_days < week[i]->subj_num[days]; p_days++) {
-            bot.sendMessage("----- " + String(week[i]->less_nums[days][p_days]), error_chat);
+        uint8_t error_count = 0;    // счетчик ошибок реаллокации - чтобы не спамить, если их будет несколько
+      
+        for (uint8_t week_it = 0; week_it < 2; week_it++) {        // своеобразный shrink to fit, чтобы не занимать лишние байты
+          for (uint8_t days = 0; days < 7; days++) {
+              if (week[i]->subj_num[week_it][days] == 0) {         // пар тут нету
+                free(week[i]->less_nums[week_it][days]);
+                week[i]->less_nums[week_it][days] = nullptr;       // освободили и присвоили нуллптр
+                continue;
+              }
+
+              uint8_t *new_ptr = (uint8_t*)realloc(week[i]->less_nums[week_it][days], week[i]->subj_num[week_it][days] * sizeof(uint8_t));
+              if (new_ptr != nullptr) {                       // только если реаллокация удалась
+                week[i]->less_nums[week_it][days] = new_ptr;     // переназначаем старый указатель на новую память. При неудаче реаллокации - старый указатель не инвалидируется, а значит просто забиваем на ошибку и работаем дальше
+              else error_count++;
           }
-        }*/
-
-        for (uint8_t itt = 0; itt < 2; itt++) {           // своеобразный shrink to fit, чтобы не занимать лишние байты
-
         }
+        if (error_count)  bot.sendMessage("Realloc для less_nums не удалось совершить " + error_count + " раз!", error_chat);
+
+        String log_info = "Данные недели ";
+        log_info += (!i) ? "этой" : "предыдущей";
+        log_info += " четности";
+        for (uint8_t subgr = 0; subgr < 2; subgr++) {
+          log_info += "\n\nПодгруппа ";
+          log_info += subgr+1;
+          log_info += ": Учебных дней: ";
+          log_info += week[i]->study_days[subgr];
+          for (uint8_t days = 0; days < 7; days++) {
+            log_info += "\n День ";
+            log_info += days+1;
+            log_info += ": ";
+              for (uint8_t p_days = 0; p_days < week[i]->subj_num[subgr][days]; p_days++) {
+                log_info += week[i]->less_nums[subgr][days][p_days];
+              }
+            }
+        }
+        bot.sendMessage(log_info, error_chat);
 
         if (real_width != settings.table_width[i]) {
           settings.table_width[i] = real_width;
