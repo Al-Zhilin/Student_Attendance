@@ -665,14 +665,14 @@ class Menu {
 
   public:
     void start_page(bool mode, FDstat_t file_status = FD_NO_DIF) {        // функция показа стартовой страницы
-      // file_status отображает статус работы с файлом настроек, нужен (в данной функции) для понимания - отправлять или подтягивать сообщения у пользователей
+      // file_status отображает статус работы с файлом настроек, нужен (в данной функции) для понимания - отправлять или подтягивать сообщения у пользователей (О - оптимизация)
       way.reserve(7);
 
       bot.notify(false);
       if (!mode)  {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
           if (file_status == FD_WRITE || file_status == FD_ADD) {
-            bot.sendMessage("ИСиТенок v" + String(Version, 1), Admins[i]);
+            bot.sendMessage("ИСиТенок v" + String(Version, 2), Admins[i]);
             chat_settings.status_mess[i] = bot.lastBotMsg();
           }
           else bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);
@@ -683,13 +683,13 @@ class Menu {
 
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
         if (file_status == FD_WRITE || file_status == FD_ADD) {
-          bot.inlineMenu("Выберите:", s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
+          bot.inlineMenu("Выберите действие:", s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);             // отправляем меню заново
           chat_settings.menu_id[i] = bot.lastBotMsg();
         }
-        else  bot.editMenu(chat_settings.menu_id[i], s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);
+        else  bot.editMenu(chat_settings.menu_id[i], s_menu[0] + "\t" + s_menu[1] + "\t" + s_menu[2] + "\n" + s_menu[3], Admins[i]);       // или подтягиваем, если кол-во и "качество" (замена одного на другого) юзеров не менялись
       }
 
-      bot.notify(false);
+      bot.notify(true);
       chat_file.update();
     }
 
@@ -1654,16 +1654,13 @@ void setup() {
   }
 
   if (week_off < 1) {
-    bot.sendMessage("Переменная week_off в структуре file_data должная иметь значение > 1!\nИзмените параметр, прежде чем продолжить работу!", error_chat);
-    for (;;) {
-      ArduinoOTA.handle();
-    }
+    bot.sendMessage(F("Переменная week_off в структуре file_data должная иметь значение > 1!"), error_chat);
+    CriticalError();
   }
 
   bot.clearServiceMessages(true);                                             //автоматическое удаление всех "сервисных" сообщений по типу "... закрепил сообщение"
 
   menu.start_page(0, file_stat);       // чисто для обновления структуры FB_Time
-  bot.sendMessage("11", error_chat);
   list.begin();
   menu.start_page(1, file_stat);       // вот тут уже отсылаем менюшку
 }

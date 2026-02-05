@@ -2,33 +2,11 @@ void newMsg(FB_msg& msg) {
   bool undefined_user = true;
   static String last_undefined = "";
 
-  if (msg.chatID == last_undefined) return;       //неизвестный пишет снова. Просто игнорируем
-
-  if (undefined_user) {
-    for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-      if (msg.chatID == Admins[i])  {
-        undefined_user = false;
-        break;
-      }
-    }
-
-    if (undefined_user) for (byte i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {
-      if (msg.chatID == Groups[i])  {
-        undefined_user = false;
-        break;
-      }
-    }
-  }
-
-  if (undefined_user) {       //отправитель сообщения не задан как админ или поддерживаемая группа, с такими не общаемся
-    last_undefined = msg.chatID;
-    bot.sendMessage(msg.username + ", по всей информации обращайтесь к старосте (" + GROUP_COMMANDER + ") или в общую группу!", msg.chatID);
-    bot.sendMessage("Пользователь " + msg.username + " написал: \n" + msg.text, error_chat);
-    return;
-  }
+  if (msg.chatID == last_undefined) return;       // неизвестный пишет снова. Просто игнорируем
 
   //-----------------------------------------Обработка ТОЛЬКО чатов с админами------------------------------------------
   for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
+    undefined_user = false;
     if (msg.chatID == Admins[i]) {
 
       if (msg.OTA) bot.update();
@@ -64,13 +42,19 @@ void newMsg(FB_msg& msg) {
   }
 
   //-------------------------------------------Обработка ТОЛЬКО групп------------------------------------------
-  for (int i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {                   
+  for (int i = 0; i < sizeof(Groups)/sizeof(Groups[0]); i++) {
+    undefined_user = false;                  
     if (msg.chatID == Groups[i]) {
       if (msg.text == BOT_USERNAME) bot.replyMessage("Чо случилось? Список моих возможностей можно посмотреть с помощью /comms", bot.lastUsrMsg(), msg.chatID);
     }
   }
 
-
+  if (undefined_user) {       //отправитель сообщения не задан как админ или поддерживаемая группа, с такими не общаемся
+    last_undefined = msg.chatID;
+    bot.sendMessage(msg.username + ", по всей информации обращайтесь к старосте (" + GROUP_COMMANDER + ") или в общую группу!", msg.chatID);
+    bot.sendMessage("Пользователь " + msg.username + " написал:\n" + msg.text, error_chat);
+    return;
+  }
 
   //----------------------------------------------Обработка всех чатов вместе-------------------------------------------
   if (msg.text == "Кинуть кубик" || msg.text == "Бросить кубик")  bot.replyMessage(msg.username + ", выпало число: " + String(random(UINT_MAX)%6+1), bot.lastUsrMsg(), msg.chatID);      //добавить рандом для числа из пользовательнского диапазона
