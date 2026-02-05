@@ -1,18 +1,18 @@
-/*void briefInput(Text message, String chat) {
+void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less[MAX_LESSONS] = {}, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "", post_symbol = "", temp_dataa = "";
-  byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не по стандарту
+  byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не по стандарту, как отсутствующие
   MemoryControl MemControl;
 
   post_symbol.reserve(10);
 
-  for (int i = 0; i <= message.count("\n"); i++) {                  // цикл, каждый раз берем часть сообщения до перевода строки
+  for (uint8_t i = 0; i <= message.count("\n"); i++) {                  // цикл, каждый раз берем часть сообщения до перевода строки
     SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
     Text dataa(temp_dataa);
 
-    for (int j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                // выискиваем среди всех фамилий нашу
+    for (uint8_t j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                // выискиваем среди всех фамилий нашу
       syntax_errors = 0;
       if (CheckSurnameMatch(dataa.toString(), students[j].surname, &syntax_errors)) {       // нашли в строке фамилию из списка
         if (!i) input_found = 1;     // фамилия найдена сразу же в первой строке ввода
@@ -29,7 +29,7 @@
     if (input_found)  break;
   }
 
-  //bot.sendMessage(String(presence_mode) + "/" + String(input_found), error_chat);
+  //bot.sendMessage(String(presence_mode) + "/" + String(input_found), error_chat);         // отладочка
 
   //if (input_found == 2 && !isDigit((message.getSub(presence_mode, "\n").toString())[0]))  input_found = 1;        //если первая строка не фамилия, но и не условие - значит сильно опечатанная фамилия. Воспринимаем как сокр ввод без условия
 
@@ -43,7 +43,7 @@
     condition.trim();                                          //убираем лишние пробелы
     bool unique_end = false;
     if (condition.endsWith("вчера") || condition.endsWith("позавчера") || condition.endsWith("сегодня")) unique_end = true;
-    for (int i = 0; i < condition.length();) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста
+    for (int i = 0; i < condition.length();) {                        //хитрая инкрементация цикла для посимвольной обработки возможного русского текста (символов различного байтового объема)
       byte c = condition[i], charLen = 1;
 
       if ((c & 0x80) == 0x00) charLen = 1; // ASCII
@@ -142,12 +142,11 @@
 
   serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nПолучаю данные из таблицы...");
 
-  //будем хранить будущие обьекты для запроса для обеих подгрупп
-  //[подгруппа][массив Нок для каждой пары, которые уже были выставлены в Таблице]
-  FirebaseJson nki_array[2][lessons_found];
+  //будем хранить будущие обьекты для запроса
+  //[массив Нок для каждой пары, которые уже были выставлены в Таблице]
+  FirebaseJson nki_array[lessons_found];
 
-  bool need_post[2] = {false, false};                             //есть ли пропуски у людей этой продгруппы. Если нет - то и смысла отправлять запрос в будущем нету
-  byte table_indexes[2][lessons_found] = {};                        //индексы в таблице (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
+  byte table_indexes[lessons_found] = {};                        //индексы в таблице для каждой выставляемой пары (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
 
   nka.surn = "";
   nka.date.day = found_day;
@@ -312,7 +311,7 @@
   }
 
   serviceMess.edit("Сокращенный ввод обработан!\nRAM занято: " + String(MemControl.getDiff()/1024) + " кБ.", 5000);
-}*/
+}
 
 String UpdateArrayCell(byte presence_m, String post_symbol, String old_nka) {
   if (presence_m)  return " ";

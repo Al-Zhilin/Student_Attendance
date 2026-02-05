@@ -10,7 +10,6 @@ void getNIndex() {
     if (diff % 7 != 0) days_ago = 7 - (diff % 7);
   }
 
-  byte k = 0;
   bool found = false;
 
   if (nka.surn == "")  {
@@ -19,13 +18,12 @@ void getNIndex() {
   }
 
   else {
-    for (int i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
+    for (uint8_t i = 0; i < sizeof(students)/sizeof(students[0]); i++) {
       if (students[i].surname == nka.surn)  {
         found = true;
-        nka.posI = (people_list_i + (offset * (week_off-1 - weeks_ago))) + k;
+        nka.posI = (people_list_i + (offset * (week_off-1 - weeks_ago))) + i;
         break; 
       }
-      k++;
     }
   }
 

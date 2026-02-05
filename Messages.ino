@@ -19,23 +19,19 @@ void newMsg(FB_msg& msg) {
       }
 
       else if (msg.text == "/res") {
-        bot.tickManual();
+        bot.tickManual();                                                                       // защита от bootloop
         bot.sendMessage("Перезагружаюсь!", msg.chatID);
         ESP.restart();
       }
       
-      else if (msg.data != "") {
+      else if (msg.data != "") {                                                                // msg.data - указыает что сообщение = коллбек от нажатия кнопки меню
         Text parse(msg.data);
         menu.menuEdit(parse.decodeUnicode(), msg.chatID);
       }
 
       else {
         Text mess_text(msg.text);
-        MemoryControl MemControl;
-        //briefInput(mess_text.decodeUnicode(), msg.chatID);                                    //обработка возможного сокращенного ввода
-        MemControl.check();
-        bot.sendMessage("Разница до и после функции: " + String(MemControl.getDiff()), error_chat);
-        timer.add(bot.lastBotMsg(), 20, error_chat);
+        briefInput(mess_text.decodeUnicode(), msg.chatID);                                    // обработка возможного сокращенного ввода. Раскодируем Юникод для корректной обработки Рашн ленгвича
       }
       break;     
     }
@@ -46,11 +42,13 @@ void newMsg(FB_msg& msg) {
     undefined_user = false;                  
     if (msg.chatID == Groups[i]) {
       if (msg.text == BOT_USERNAME) bot.replyMessage("Чо случилось? Список моих возможностей можно посмотреть с помощью /comms", bot.lastUsrMsg(), msg.chatID);
+      // именно на этом месте должна находится иная работа с групповым чатом
+      break;
     }
   }
 
-  if (undefined_user) {       //отправитель сообщения не задан как админ или поддерживаемая группа, с такими не общаемся
-    last_undefined = msg.chatID;
+  if (undefined_user) {           // отправитель сообщения не задан как админ или поддерживаемая группа, с такими не общаемся. На первый раз посылаем, дальше игнорируем
+    last_undefined = msg.chatID;        // позволяем при повторном сообщении от него с порого ингорировать, никак не обрабатывая
     bot.sendMessage(msg.username + ", по всей информации обращайтесь к старосте (" + GROUP_COMMANDER + ") или в общую группу!", msg.chatID);
     bot.sendMessage("Пользователь " + msg.username + " написал:\n" + msg.text, error_chat);
     return;
@@ -79,7 +77,7 @@ void newMsg(FB_msg& msg) {
       group_list += "Список второй подгруппы:\n\n";
     }
     else {
-      bot.sendMessage(F("Уточните корректнее, какой вариант списка вас интересует!"), msg.chatID);
+      bot.sendMessage(F("Уточните корректнее, какой вариант списка вас интересует?"), msg.chatID);
       return;
     }
     
@@ -96,5 +94,5 @@ void newMsg(FB_msg& msg) {
   }
 
 
-  else if (msg.text.startsWith("/")) bot.replyMessage("А вот щас вообще не понял, что вы хотите от меня?", bot.lastUsrMsg(), msg.chatID);
+  else if (msg.text.startsWith("/")) bot.replyMessage("А вот щас вообще не понял, что вы хотите от меня?", bot.lastUsrMsg(), msg.chatID);               // начиналось как команда - а точного эндпоинта так и не нашлось
 }
