@@ -1,10 +1,11 @@
 void briefInput(Text message, String chat) {
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
-  byte found_less[MAX_LESSONS] = {}, found_month = 0, found_day = 0, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
+  byte found_less[MAX_LESSONS] = {}, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "", post_symbol = "", temp_dataa = "";
   byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не по стандарту, как отсутствующие
   MemoryControl MemControl;
+  Date found_date(0, 0, realTime.year);
 
   post_symbol.reserve(10);
 
@@ -53,7 +54,7 @@ void briefInput(Text message, String chat) {
       i += charLen; // увеличиваем i на длину символа
 
       if (faza == 0) {    //ищем номер пары
-        if (isDigit(symbol[0])) found_less[lessons_found] = found_less[lessons_found]*10 + (symbol[0] - '0');         //собираем номер пары, смеха ради поддерживаем даже двузначные и более номера
+        if (isDigit(symbol[0])) found_less[lessons_found] = found_less[lessons_found]*10 + (symbol[0] - '0');         //собираем номер пары, на всякий случай поддерживаем даже двузначные и более номера
         else if (symbol.startsWith(","))  lessons_found++;
         else if (ignored_symbols.indexOf(symbol) == -1) {faza++; lessons_found++;}       //специально проваливаемся сразу, чтобы не упустить ни буквы следующего ввода
       }
@@ -68,9 +69,9 @@ void briefInput(Text message, String chat) {
         if (symbol[0] == '.') faza++;       //нашли разделитель дня и месяца .(точку) - переходим к извлечению месяца
         
         else if (isDigit(symbol[0])) {
-          found_day = found_day*10 + (symbol[0] - '0');
-          if (found_day > 31)  {
-            serviceMess.edit("Значение дня в сокращенном вводе некорректно: \"" + String(found_day) + "\"!");
+          found_date.day = found_date.day*10 + (symbol[0] - '0');
+          if (found_date.day > 31)  {
+            serviceMess.edit("Значение дня в сокращенном вводе некорректно: \"" + String(found_date.day) + "\"!");
             return;
           }
         }
@@ -78,53 +79,53 @@ void briefInput(Text message, String chat) {
 
       if (faza == 3) {    //ищем месяц
         if (isDigit(symbol[0])) {
-          found_month = found_month*10 + (symbol[0] - '0');
-          if (found_month > 12)  {
-            serviceMess.edit("Значение месяца в сокращенном вводе некорректно: \"" + String(found_month) + "\"!");
+          found_date.month = found_date.month*10 + (symbol[0] - '0');
+          if (found_date.month > 12)  {
+            serviceMess.edit("Значение месяца в сокращенном вводе некорректно: \"" + String(found_date.month) + "\"!");
             return;
           }
         }
 
-        if (i == condition.length() && found_month) faza = 4;
+        if (i == condition.length() && found_date.month) faza = 4;
       }
     }
 
 
-
     //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
-    if (faza == 2 && found_day) faza = 3;                 //фиксит случай "1 пара 20" (без точки на конце) - здесь надо сделать фазу = 3, т.к. не хватает только месяца
+    if (faza == 2 && found_date.day) faza = 3;                 //фиксит случай "1 пара 20" (без точки на конце) - здесь надо сделать фазу = 3, т.к. не хватает только месяца
 
     if (faza == 2) {                                                        //указан только номер пары - значит Нка ставится сегодня
-      if (unique_end) {                                                             //если имеет на конце одно из этих слов - значит дата в них завуалирована
-        Date today(realTime.day, realTime.month);
-        if (condition.endsWith("позавчера"))  sumDate(&today, -2);              //Важно! Сначала проверяем это
-        else if (condition.endsWith("вчера")) sumDate(&today, -1);              //только потом это, не наоборот! (да, я здесь накосячил по глупости изначально)
-        found_day = today.day;
-        found_month = today.month;
+      if (unique_end) {                                                         // если имеет на конце одно из этих слов - значит дата в них указана в неявном виде
+        Date todayWithOffset(realTime.day, realTime.month, realTime.year);
+        if (condition.endsWith("позавчера"))  sumDate(&todayWithOffset, -2);              // Важно! Сначала проверяем это
+        else if (condition.endsWith("вчера")) sumDate(&todayWithOffset, -1);              // только потом это, не наоборот!
+        else if (!condition.endsWith("сегодня"))  {
+          bot.sendMessage("Неизвестное окончание в условии сокращенного ввода!", chat);
+          return;
+        }
+        found_date = todayWithOffset;
       }
 
-      else {                                                                        //не имеет на конце специальных слов
-        found_day = realTime.day;
-        found_month = realTime.month;
+      else {                                                                    // не имеет на конце специальных слов
+        found_date.day = realTime.day;
+        found_date.month = realTime.month;
       }
     }
 
     else if (faza == 3) {    //если указан только день - месяц воспринимаем как текущий
-      found_month = realTime.month;
+      found_date.month = realTime.month;
     }
 
     else if (faza == 1) {
       serviceMess.edit("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!", 7000);
       return;
     }
-
     //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
-
   }
 
   else {                                 //Присваиваем данные текущего дня и пары, которая идет именно сейчас, если пользователь не указал эти данные явно (ввод без условия)
-    found_day = realTime.day;
-    found_month = realTime.month;
+    found_date.day = realTime.day;
+    found_date.month = realTime.month;
     Time now_time(realTime.hour, realTime.minute);
     
     for (byte i = 0; i < (sizeof(lessons)/sizeof(lessons[0])); i++) {
@@ -134,7 +135,7 @@ void briefInput(Text message, String chat) {
         break;
       }
     }
-    if (!found_less[lessons_found++]) {                                     // инкрементируем здесь, чтобы корректно проверить
+    if (!found_less[lessons_found++]) {                                     // инкрементируем здесь, чтобы далее переменная имела корректное значение
       serviceMess.edit("Убедитесь в корректности текущей пары!", 5000);
       return;
     }
@@ -142,72 +143,79 @@ void briefInput(Text message, String chat) {
 
   serviceMess.edit("Сокращенный ввод " + String((input_found == 1) ? "без условия" : "с условием") + " принят!\nПолучаю данные из таблицы...");
 
-  //будем хранить будущие обьекты для запроса
-  //[массив Нок для каждой пары, которые уже были выставлены в Таблице]
+  // будем хранить будущие обьекты для запроса
+  // [массив Нок для каждой пары, которые уже были выставлены в Таблице]
   FirebaseJson nki_array[lessons_found];
 
-  byte table_indexes[lessons_found] = {};                        //индексы в таблице для каждой выставляемой пары (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
+  uint8_t table_indexes[lessons_found] = {};                        // индексы в таблице для каждой выставляемой пары (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
+  bool subgLessCorrect[2] = {true, true};                           // имеет ли та или иная подгруппа введенную пару. При парсинге фамилий будем учитывать
 
-  nka.surn = "";
+  nka.surn = "";                                                    // позволяет в алгоритме функции получить не у конкретной, а у первой в списке фамилии posI
   nka.date.day = found_day;
   nka.date.month = found_month;
 
-  for (byte i = 0; i < 2; i++) {                                  //заполняем оба обьекта "", по количеству людей в подгруппе. В дальнейшем будем заменять некоторые позиции на фамилии. Гарантирует 'неразрывность' JSON документа
-    nka.subgroup = i;
+  bool week_index = (week[0]->parity == nka.parity);        // индекс недели, получается из соответсивия/не соответствия четности текущей недели и той, на которой будут выставляться пропуски
+
+  // ------------------------------ Валидация введенных пользователем пар ------------------------------
+  for (uint8_t sub = 0; sub < 2; sub++) {
+    nka.subgroup = sub;
     getNIndex();
-    byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);        //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
-    
     for (byte less = 0; less < lessons_found; less++) {
       bool valid_less = false;
-      for (byte day_iter = 0; day_iter < week[week_index]->subj_num[nka.dayWeek-1]; day_iter++) {
-        if (week[week_index]->less_nums[nka.dayWeek-1][day_iter] == found_less[less])  {
+      for (byte day_iter = 0; day_iter < week[week_index]->subj_num[sub][nka.dayWeek-1]; day_iter++) {
+        if (week[week_index]->less_nums[sub][nka.dayWeek-1][day_iter] == found_less[less])  {
           valid_less = true;
           break;
         }
-        table_indexes[i][less]++;
+        table_indexes[less]++;
       }
-      if (!valid_less) {
-        // убираем выставление Нок для всех пар (хз, мб нужно прерывать выставление ТОЛЬКО для этой пары, но я считаю, что при таком случае пользователь скорее всего ошибся днем и лучше его вовсе остановить)
-        bot.sendMessage(String(ALERT_SYMBOL) + " В данный день у " + String(i+1) + " подгруппы нет пары под номером " + String(found_less[less]) + "!\nПересмотрите сокращенный ввода заново! " + String(ALERT_SYMBOL), chat);
-        timer.add(bot.lastBotMsg(), 20, chat);
-        for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
-        return;
-      }
-    }
-
-    for (byte less = 0; less < lessons_found; less++) {
-      String range = ((!i) ? Sheet1 : Sheet2);
-      range += charOffset(String(nka.posC), table_indexes[i][less]);                   // собираем полный вид диапазона для чтения/записи
-      range += nka.posI;
-      range += ":";
-      range += charOffset(String(nka.posC), table_indexes[i][less]);
-      range += nka.posI + people_in_subgr[i] - 1;
-
-      tries = 0;
-      while (!GSheet.values.get(&nki_array[i][less], spreadsheetId, range) && tries < GetTryNum) tries++;
-      if (tries == SetTryNum) bot.sendMessage(F("ErrorGetRequest! (Получение существующий пропусков из Sheet)"), chat);
-    
-      for (byte j = 0; j < people_in_subgr[i]; j++) {
-        String address = "values/[";
-        address += j;
-        address += "]/[0]";
-        if (getJsonData(nki_array[i][less], address, false) == "invalidPath") {
-          if (!presence_mode) nki_array[i][less].set(address, "");
-          else nki_array[i][less].set(address, "D");
-        }
-      }
-
-      if (!MemControl.check()) {
-        serviceMess.edit(F("Нехватка RAM! (Этап формирование массивов)"), 7000);
-        for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
-        return;
-      }
+      if (!valid_less)  subgLessCorrect[sub] = false;               // в дальнейшем, если окажется, что была введена фамилия подгруппы, у которой пары нет - просто покажем ошибку и выйдем - выставление не может быть произведено
     }
   }
+  // ------------------------------ Валидация введенных пользователем пар ------------------------------
+  
 
+
+  // ------------------------------ Получение существующих пропусков ------------------------------
+  for (byte less = 0; less < lessons_found; less++) {
+    String range = SheetName;
+    range += charOffset(String(nka.posC), table_indexes[less]);                   // собираем полный вид диапазона для чтения/записи
+    range += nka.posI;
+    range += ":";
+    range += charOffset(String(nka.posC), table_indexes[less]);
+    range += nka.posI + sizeof(students)/sizeof(students[0]) - 1;
+
+    tries = 0;
+    while (!GSheet.values.get(&nki_array[less], spreadsheetId, range) && tries < GetTryNum) tries++;
+    if (tries == SetTryNum) {
+      bot.sendMessage(F("ErrorGetRequest! (Получение существующих пропусков из Sheet)\nОбработка сокращенного ввода досрочно прервана!"), chat);
+
+    }
+  
+    for (byte j = 0; j < sizeof(students)/sizeof(students[0]); j++) {
+      String address = "values/[";
+      address += j;
+      address += "]/[0]";
+      if (getJsonData(nki_array[less], address, false) == "invalidPath") {
+        if (!presence_mode) nki_array[less].set(address, "");
+        else nki_array[less].set(address, "D");
+      }
+    }
+
+    if (!MemControl.check()) {
+      serviceMess.edit(F("Нехватка RAM! (Этап формирование массивов)"), 7000);
+      for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[lesss].clear();            // очищаем массивы вручную
+      return;
+    }
+  }
+  // ------------------------------ Получение существующих пропусков ------------------------------
+
+
+
+  // ------------------------------ Обработка введенных фамилий ------------------------------
   serviceMess.edit("Обрабатываю введенные фамилии...");
 
-  for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) {                   //обрабатываем фамилии
+  for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) { 
     SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
     Text dataa(temp_dataa);
     byte surname_length[2] = {};                                                //количество фамилий этой подгруппы перед найденной. Нужно для вставки фамилии в документе на правильное место
@@ -282,10 +290,14 @@ void briefInput(Text message, String chat) {
         return;
     }
   }
+  // ------------------------------ Обработка введенных фамилий ------------------------------
 
+
+
+  // ------------------------------ Выставление новых пропусков ------------------------------
   serviceMess.edit("Выставляю пропуски...");
 
-  for (byte i = 0; i < 2; i++) {                      // выставление
+  for (byte i = 0; i < 2; i++) {
     if (!need_post[i] && !presence_mode)  {
       for (byte less = 0; less < lessons_found; less++) nki_array[i][less].clear();
       continue;
@@ -309,6 +321,8 @@ void briefInput(Text message, String chat) {
       if (tries == SetTryNum) bot.sendMessage(F("ErrorSendRequest! (Отправка пропусков в Sheet)"), chat);
     }
   }
+  // ------------------------------ Выставление новых пропусков ------------------------------
+
 
   serviceMess.edit("Сокращенный ввод обработан!\nRAM занято: " + String(MemControl.getDiff()/1024) + " кБ.", 5000);
 }

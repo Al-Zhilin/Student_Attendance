@@ -475,6 +475,7 @@ class Sheet {
             log_info += ": ";
               for (uint8_t p_days = 0; p_days < week[i]->subj_num[subgr][days]; p_days++) {
                 log_info += week[i]->less_nums[subgr][days][p_days];
+                if (p_days != week[i]->subj_num[subgr][days]-1) log_info += ", ";
               }
             }
         }
