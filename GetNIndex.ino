@@ -39,6 +39,8 @@ void getNIndex() {
   uint16_t sm = 1;
   
   for (int i = 0; i < days_ago; i++) {
+
+
     sm += 1 + countLessonsInDay(week[week[0]->parity != nka.parity]->less_nums[0][i], week[week[0]->parity != nka.parity]->subj_num[0][i], week[week[0]->parity != nka.parity]->less_nums[1][i], week[week[0]->parity != nka.parity]->subj_num[1][i]);
   }   // P.S. алгоритм получил "магические числа" в процессе оптимизации, см. ранние коммиты (до февраля 2026), чтобы вникнуть в суть
   
