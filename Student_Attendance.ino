@@ -7,7 +7,7 @@
 #include <ESP_Google_Sheet_Client.h>
 #include <StringUtils.h>
 #include <ArduinoOTA.h>
-#include <ESPmDNS.h>          // в какой-то момент без этого явного включения компилятор начал ругаться на отсутствие либы
+#include <ESPmDNS.h>
 #include <settings.h>
 #include "types.h"
 
@@ -104,22 +104,53 @@ struct SetInfo {    //структура с данными, нужными дл�
   Date date;            //дата выставления Нки
   uint8_t dayWeek;      //день недели (1-7 / понедельник-воскресенье)
   String posC;          //символьная составлющая координаты ячейки
-  uint16_t posI;             //численная составляющая координаты ячейки
+  uint16_t posI;        //численная составляющая координаты ячейки
   bool subgroup;        //подгруппа (false/true, 1/2 соответственно)
   bool parity;          //четность/нечетность (0/1 соответственно) недели, в которой ставим Нку
 } nka;
 
 struct WeekInfo {
-  Date pon_date;                                     //дата понедельника этой недели
-  uint8_t study_days[2] = 0;                            //количество учебных дней в неделе у 2х подгрупп
-  uint8_t subj_num[2][7] = {};                          //кол-во пар в учебных днях у 2х подгрупп
-  uint8_t* less_nums[2][7];                            //номера всех пар в дне у 2х подгрупп
-  bool parity;             //четная/нечетная (true/false соответственно) эта неделя
+  Date pon_date();                                      // дата понедельника этой недели
+  uint8_t study_days[2] = {};                           // количество учебных дней в неделе у 2х подгрупп
+  uint8_t subj_num[2][7] = {};                          // кол-во пар в учебных днях у 2х подгрупп
+  uint8_t* less_nums[2][7] = {nullptr};                 // номера всех пар в дне у 2х подгрупп
+  bool parity;                                          // четная/нечетная (true/false соответственно) эта неделя
+
+  uint8_t* result_less_nums[7] = {nullptr};             // результирующий массив пар обоих подгрупп - сильно облегчает нахождение нужных позиций в таблице, содержит по факту значения номеров пар в исходном порядке из таблицы
+  uint8_t result_subj_num[7] = {};                      // в совокупности с этим массивом общего количества пар в каждый день позволяет удобно и безболезненно бегать по таблице и выискивать нужные позиции в ней
   
+  void formResultArrays() {               // формирует оба результирующих массива в этом объекте
+      for (uint8_t days = 0; days < 7; days++) {
+          result_less_nums[days] = (uint8_t*)malloc((this->subj_num[0][days] + this->subj_num[1][days]) * sizeof(uint8_t));
+          if (!result_less_nums[days])  {
+            bot.sendMessage(F("Ошибка выделения памяти для результирующего массива!"), error_chat);
+            CriticalError();
+          }
+
+          uint8_t i = 0, j = 0, k = 0;
+
+          while (i < this->subj_num[0][days] && j < this->subj_num[1][days]) {
+            if (less_nums[0][days][i] < less_nums[1][days][j])  result_less_nums[days][k++] = less_nums[0][days][i++];
+
+            else if (less_nums[0][days][i] > less_nums[1][days][j]) result_less_nums[days][k++] = b[j++];
+
+            else {
+                result_less_nums[days][k++] = less_nums[0][days][i++];
+                j++;
+            }
+        }
+
+        while (i < this->subj_num[0][days]) result_less_nums[days][k++] = less_nums[0][days][i++];
+        while (j < this->subj_num[1][days]) result_less_nums[days][k++] = less_nums[1][days][j++];
+
+        result_subj_num[days] = k;                  // Реальное количество пар в таблице у конкретного [days] дня
+      }
+  }
+
   WeekInfo() {
-    for (uint8_t week = 0; week < 2; week++) {
+    for (uint8_t sub = 0; sub < 2; sub++) {
         for (uint8_t days = 0; days < 7; days++) {
-            less_nums[week][days] = (uint8_t*)malloc(MAX_LESSON_IN_DAY * sizeof(uint8_t));
+            less_nums[sub][days] = (uint8_t*)malloc(MAX_LESSON_IN_DAY * sizeof(uint8_t));
         }
     }
   }
@@ -127,9 +158,10 @@ struct WeekInfo {
   // деструктор в этой структуре необязателен, т.к. она будет существовать на всем протяжении работы программы, а при выключении питания ESP32 SRAM (энергозависимая!!!) самоочиститься, а при перезагрузке - менеджер памяти 
   // переразметит кучу, тем самым, по факту, затрет/инвалидирует все выделенные в ней старые данные. 
 
-} week_object[2];      //0 - текущая неделя, 1 - противоположная по четности
+} week_object[2];      //0 - текущая неделя, 1 - противоположная по четности;
 
-WeekInfo *week[2] = {&week_object[0], &week_object[1]};           //week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели. Такое объявление нужно для удобного свайпа указателей при смене четности
+WeekInfo *week[2] = {&week_object[0], &week_object[1]};           // week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели
+                                                                  // Такое объявление нужно для удобного свайпа указателей при смене четности
 
 byte CheckSurnameMatch(String s_input, String s_list, byte* syntax_errors, byte max_errors = SURNAME_ERRORS_NUM);
 
@@ -487,7 +519,7 @@ class Sheet {
         }
         //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
       }
-      
+      formResultArrays();                                               // формируем те самые рещультирующие массивы
       checkTableWeek();                                                 //проверяем неделю на актуальность
     }
 

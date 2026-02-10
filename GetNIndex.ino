@@ -45,7 +45,7 @@ void getNIndex() {
   nka.posC = charOffset(String(people_list_c), sm);
 }
 
-uint16_t countLessonsInDay(const uint8_t *arr1, uinnt8_t n, const uint8_t *arr2, uint8_t m) {           // метод подсчета слиянием
+uint16_t mergeArrays(const uint8_t *arr1, uint8_t n, const uint8_t *arr2, uint8_t m) {           // реализован алгоритм объединения (или подсчета) методом слияния
     size_t i = 0, j = 0;
     size_t count = 0;
 
