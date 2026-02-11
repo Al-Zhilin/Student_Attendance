@@ -39,38 +39,8 @@ void getNIndex() {
   uint16_t sm = 1;
   
   for (int i = 0; i < days_ago; i++) {
-
-
-    sm += 1 + countLessonsInDay(week[week[0]->parity != nka.parity]->less_nums[0][i], week[week[0]->parity != nka.parity]->subj_num[0][i], week[week[0]->parity != nka.parity]->less_nums[1][i], week[week[0]->parity != nka.parity]->subj_num[1][i]);
+    sm += week[week[0]->parity != nka.parity]->days[days_ago].subj_num;
   }   // P.S. алгоритм получил "магические числа" в процессе оптимизации, см. ранние коммиты (до февраля 2026), чтобы вникнуть в суть
   
   nka.posC = charOffset(String(people_list_c), sm);
-}
-
-uint16_t mergeArrays(const uint8_t *arr1, uint8_t n, const uint8_t *arr2, uint8_t m) {           // реализован алгоритм объединения (или подсчета) методом слияния
-    size_t i = 0, j = 0;
-    size_t count = 0;
-
-    while (i < n && j < m) {
-        if (arr1[i] < arr2[j]) {
-            // Элемент в первом массиве меньше, берем его
-            count++;
-            i++;
-        } else if (arr1[i] > arr2[j]) {
-            // Элемент во втором массиве меньше, берем его
-            count++;
-            j++;
-        } else {
-            // Элементы равны. Учитываем только один раз и сдвигаем оба указателя
-            count++;
-            i++;
-            j++;
-        }
-    }
-
-    // Добавляем оставшиеся элементы, если один из массивов закончился раньше
-    count += (n - i);
-    count += (m - j);
-
-    return count;
 }

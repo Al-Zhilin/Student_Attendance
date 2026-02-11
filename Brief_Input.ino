@@ -148,28 +148,33 @@ void briefInput(Text message, String chat) {
   FirebaseJson nki_array[lessons_found];
 
   uint8_t table_indexes[lessons_found] = {};                        // индексы в таблице для каждой выставляемой пары (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
-  bool subgLessCorrect[2] = {true, true};                           // имеет ли та или иная подгруппа введенную пару. При парсинге фамилий будем учитывать
+  bool targetSubgroup[2] = {};                                      // "Для какой подгруппы введенные пары могут быть выставлены (корректны)?" [0] - корректны ли для 1 подгруппы, [1] - корректны ли для второй
 
   nka.surn = "";                                                    // позволяет в алгоритме функции получить не у конкретной, а у первой в списке фамилии posI
   nka.date.day = found_day;
   nka.date.month = found_month;
 
-  bool week_index = (week[0]->parity == nka.parity);        // индекс недели, получается из соответсивия/не соответствия четности текущей недели и той, на которой будут выставляться пропуски
+  bool week_index = (week[0]->parity == nka.parity);        // индекс недели, получается из соответсивия/несоответствия четности текущей недели и той, на которой будут выставляться пропуски
 
   // ------------------------------ Валидация введенных пользователем пар ------------------------------
-  for (uint8_t sub = 0; sub < 2; sub++) {
-    nka.subgroup = sub;
-    getNIndex();
-    for (byte less = 0; less < lessons_found; less++) {
-      bool valid_less = false;
-      for (byte day_iter = 0; day_iter < week[week_index]->subj_num[sub][nka.dayWeek-1]; day_iter++) {
-        if (week[week_index]->less_nums[sub][nka.dayWeek-1][day_iter] == found_less[less])  {
-          valid_less = true;
-          break;
-        }
-        table_indexes[less]++;
+  for (uint8_t less = 0; less < lessons_found; less++) {            // перебираем все введенные пары, чтобы 
+    bool is_found = false;
+    for (uint8_t todays_less = 0; todays_less < week[week_index]->days[nka.dayWeek-1].subj_num; todays_less++) {          // цикл по всем парам нужного дня
+      if (week[week_index]->days[nka.dayweek-1].less_info[todays_less].number == found_less[less]) {
+        is_found = true;
+        uint8_t sub_have = week[week_index]->days[nka.dayweek-1].less_info[todays_less].in_subgroup;
+        if (!sub_have)  targetSubgroup[1] = false;        // пары нет у второй подгруппы точно
+        if (sub_have == 1)  targetSubgroup[0] = false;      // пары нет у первой подгруппы точно
       }
-      if (!valid_less)  subgLessCorrect[sub] = false;               // в дальнейшем, если окажется, что была введена фамилия подгруппы, у которой пары нет - просто покажем ошибку и выйдем - выставление не может быть произведено
+    }
+    if (!is_found)  {                                                     // если какой-либо введенной пары нет ни у первой, ни у второй подгруппы в расписании
+      serviceMess.edit("Пара #" + String(found_less[less]) + " не существует в введенный день ни у одной подгруппы!", 10000);
+      return;
+    }
+
+    if (!targetSubgroup[0] && !targetSubgroup[1]) {                       // сработает, если введено > 1 пары, и список введенных пар не присутствует в полной мере ни в расписании первой, ни в расписании второй подгруппы
+      serviceMess.edit(F("Введенные пары нельзя в полной мере выставить ни первой, ни второй подгруппе!"), 10000);
+      return;
     }
   }
   // ------------------------------ Валидация введенных пользователем пар ------------------------------

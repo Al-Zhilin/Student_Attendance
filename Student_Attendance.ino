@@ -16,8 +16,8 @@ FastBot bot(BOT_TOKEN);
 float Version = 0.7;                                              // текущая версия прошивки
 
 struct week_diapason {
-  byte start = 0;
-  byte end = 0;
+  uint8_t start = 0;
+  uint8_t end = 0;
 }; 
 
 struct Settings {
@@ -32,7 +32,7 @@ struct fileData {                                                 // струк�
 
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
 byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
-FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));   // ЗДЕСЬ ТОЖЕ НЕ ТРОГАТЬ!!
+FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));
 FileData chat_file(&FFat, "/data.dat", 'V', &chat_settings, sizeof(chat_settings));
 FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
@@ -242,9 +242,9 @@ class ServiceMess {
     uint32_t start_millis = 0;
 
   public:
-    void edit(String edit_text, uint32_t del_period = 0) {                  // функция редактирует сервисное сообщение, а при передаче дополнительного параметра - очищает его через timeout
+    void edit(String edit_text, uint32_t del_period = 0) {                  // функция редактирует сервисное сообщение, а при передаче дополнительного параметра - очищает его через timeout (мс)
       for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-        bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1) + ((edit_text != "") ? "\n\n" : "") + edit_text, Admins[i]);
+        bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1) + ((edit_text != "") ? ("\n\n" + edit_text) : ""), Admins[i]);
       }
 
       if (del_period) {
@@ -375,7 +375,7 @@ class Sheet {
         this->getCells(returned_json, range);                // получаем данные
 
         char path[20];
-        uint8_t current_day = FDayIndex, current_lesson[2] = {};  // значения текущих используемых индексов в массиве дней и занаятий, который сейчас заполняем. Старотовый день определяем по именя дня в первом учебном дне недели таблицы
+        uint8_t current_day = FDayIndex, current_lesson = 0;  // значения текущих используемых индексов в массиве дней и занаятий, который сейчас заполняем. Старотовый день определяем по именя дня в первом учебном дне недели таблицы
         uint8_t read_offset = 2;                                  // переменная для хранения сдвига диапазона читаемой таблицы.
         bool empty_prev = false;                                  // показывает, была ли предыдущая ячейка пустой
 
@@ -399,7 +399,7 @@ class Sheet {
 
             empty_prev = true;                 // иначе запоминаем пропуск
             for (uint8_t k = 0; k < 2; k++) if (week[i]->days[current_day].subj_num) week[i]->study_days++;       // если в предыдущем дне были пары у подгруппы -> записываем его в счетчик
-            current_lesson[0] = current_lesson[1] = 0;
+            current_lesson = 0;
             if (path_iter != settings.table_width[i]+1) continue;
           }
 
@@ -409,17 +409,18 @@ class Sheet {
                 bot.sendMessage(F("Форматирование таблицы соответствует некорректному значению дней в неделе!"), error_chat);
                 CriticalError();
               }
-
+              // ---------- Запрос названия нового дня ----------
               uint8_t total_offset = 0;
               range = SheetName;
               for (uint8_t days_iterator = 0; days_iterator < 7; days_iterator++)  total_offset += week[i]->days[days_iterator].subj_num;    // помним, что дни после ТЕКУЩЕГО заполняемого на данный момент инизиализированы 0, поэтому
               range += charOffset(String(less_num_c), total_offset);
               range += less_num_i-1;
-
               this->getCells(dayName, range);           // получили ячейку в формате JSON
+              // ---------- Запрос названия нового дня ----------
+
               dayName.get(cell, "values/[0]/[0]");      // повторно используем ранее объявленную переменную
               while (DaysOfWeek[current_day] != cell.stringValue) {       // обрабатываем возможный выходной день посреди недели, кроме как по имени дня его никак не распознать
-                if (++current_day > 6) {                                  // следим за ошибками пользователя
+                if (++current_day > 6) {                                  // следим за ошибками
                   bot.sendMessage(F("Форматирование таблицы соответствует некорректному значению дней в неделе!"), error_chat);
                   CriticalError();
                 }
@@ -427,7 +428,7 @@ class Sheet {
             }
             empty_prev = false;                 // если нашли данные - сбрасываем флаг пустой ячейки
 
-            if (current_lesson[0] >= MAX_LESSONS_IN_DAY || current_lesson[1] >= MAX_LESSONS_IN_DAY) {
+            if (current_lesson >= MAX_LESSONS_IN_DAY) {
               bot.sendMessage("Количество пар в \"" + DaysOfWeek[current_day] + "\" у одной из подгрупп превышает установленный лимит! Измените настройки!", error_chat);
               CriticalError();
             }
@@ -438,8 +439,11 @@ class Sheet {
               else if (subjects.endsWith("/"))  subgr_lesson = 0;      // если на нем заканчивается - пара только в первой подгруппы
             }
 
-            week[i]->days[current_day].less_info[current_lesson].number = parsed_number.intValue;         // номер конкретной пары
-            week[i]->days[current_day].less_info[current_lesson].in_subgroup = subgr_lesson;              // присутствие этой пары в расписании первой/второй/обоиъ подгрупп
+            if (!(week[i]->days[current_day].less_info[current_lesson].number = parsed_number.toInt())) {   // номер конкретной пары
+              bot.sendMessage(F("Ошибка парсинга номера пары!"), error_chat);
+              CriticalError();
+            }
+            week[i]->days[current_day].less_info[current_lesson].in_subgroup = subgr_lesson;              // присутствие этой пары в расписании первой/второй/обоих подгрупп
             week[i]->days[current_day].subj_num++;                                                        // общее суммарное кол-во пар у обоих подгрупп
           }
 
@@ -467,14 +471,14 @@ class Sheet {
               continue;
             }
 
-            uint8_t *new_ptr = (uint8_t*)realloc(week[i]->less_nums[week_it][days], week[i]->subj_num[week_it][days] * sizeof(uint8_t));
+            LessInfo *new_ptr = (LessInfo*)realloc(week[i]->days[dayss].less_info, week[i]->days[dayss].subj_num * sizeof(LessInfo));
             if (new_ptr != nullptr) {                       // только если реаллокация удалась
-              week[i]->less_nums[week_it][days] = new_ptr;     // переназначаем старый указатель на новую память. При неудаче реаллокации - старый указатель не инвалидируется, а значит просто забиваем на ошибку и работаем дальше
+              week[i]->days[dayss].less_info = new_ptr;     // переназначаем старый указатель на новую память. При неудаче реаллокации - старый указатель не инвалидируется, а значит просто забиваем на ошибку и работаем дальше
             }
             else error_count++;
         }
         
-        if (error_count)  bot.sendMessage("Realloc для less_nums не удалось совершить " + error_count + " раз!", error_chat);
+        if (error_count)  bot.sendMessage("Realloc для less_nums не удалось совершить " + String(error_count) + " раз!", error_chat);
 
         String log_info = "Данные недели ";
         log_info += (!i) ? "этой" : "предыдущей";

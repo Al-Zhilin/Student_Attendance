@@ -122,12 +122,12 @@ int8_t checkTableWeek() {            //функция проверки и дос
     for (byte j = 0; j < 7; j++) {     
       byte numSubjects = 0;               //введем для читаемости в отдельную переменную
 
-      if (iter % 2 != 0) numSubjects = week[0]->subj_num[j];
-      else  numSubjects = week[1]->subj_num[j];   
+      if (iter % 2 != 0) numSubjects = week[0]->days[j].subj_num;
+      else  numSubjects = week[1]->days[j].subj_num;   
 
       if (!numSubjects) {
         sumDate(&dateToWeek, 1);      //+1, т.к. переходим к следующему дню
-        continue;             //если пар в этот день нет - пропускаем
+        continue;                     //если пар в этот день нет - пропускаем
       }
 
       if (prev) valuesArray.add(FirebaseJson().set("userEnteredValue/stringValue", ""));
