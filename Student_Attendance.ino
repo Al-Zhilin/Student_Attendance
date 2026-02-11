@@ -515,10 +515,10 @@ class Sheet {
         answ.clear();
         while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
           tries++;
-      }
+        }
 
-      if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
-    }
+        if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
+      }
 
     void SetN(const String &range) {                       // базовая функция постановки Нок для одного человека в один день
       String answ = "";

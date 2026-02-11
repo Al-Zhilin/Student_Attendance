@@ -151,8 +151,8 @@ void briefInput(Text message, String chat) {
   bool targetSubgroup[2] = {true, true};                            // "Для какой подгруппы введенные пары могут быть выставлены (корректны)?" [0] - корректны ли для 1 подгруппы, [1] - корректны ли для второй
 
   nka.surn = "";                                                    // позволяет в алгоритме функции получить не у конкретной, а у первой в списке фамилии posI
-  nka.date.day = found_day;
-  nka.date.month = found_month;
+  nka.date.day = found_date.day;
+  nka.date.month = found_date.month;
 
   bool week_index = (week[0]->parity == nka.parity);        // индекс недели, получается из соответсивия/несоответствия четности текущей недели и той, на которой будут выставляться пропуски
 
@@ -160,9 +160,9 @@ void briefInput(Text message, String chat) {
   for (uint8_t less = 0; less < lessons_found; less++) {            // перебираем все введенные пары, чтобы 
     bool is_found = false;
     for (uint8_t todays_less = 0; todays_less < week[week_index]->days[nka.dayWeek-1].subj_num; todays_less++) {          // цикл по всем парам нужного дня
-      if (week[week_index]->days[nka.dayweek-1].less_info[todays_less].number == found_less[less]) {
+      if (week[week_index]->days[nka.dayWeek-1].less_info[todays_less].number == found_less[less]) {
         is_found = true;
-        uint8_t sub_have = week[week_index]->days[nka.dayweek-1].less_info[todays_less].in_subgroup;
+        uint8_t sub_have = week[week_index]->days[nka.dayWeek-1].less_info[todays_less].in_subgroup;
         if (!sub_have)  targetSubgroup[1] = false;        // пары нет у второй подгруппы точно
         if (sub_have == 1)  targetSubgroup[0] = false;      // пары нет у первой подгруппы точно
       }
@@ -185,7 +185,7 @@ void briefInput(Text message, String chat) {
   // ------------------------------ Получение существующих пропусков ------------------------------
   for (byte less = 0; less < lessons_found; less++) {                             // получаем раздельно, нету особо смысла объединять диапазон в единый, т.к. пары могут быть не в смежных столбцах
     String range = SheetName;                                                                                                           // может быть позже сделаем оптимизацию случая их смежности
-    range += charOffset(String(nka.posC), table_indexes[less]);                   // собираем полный вид диапазона для чтения/записи
+    range += charOffset(String(nka.posC), table_indexes[less]);                   // собираем полный вид диапазона для чтения
     range += nka.posI;
     range += ":";
     range += charOffset(String(nka.posC), table_indexes[less]);
@@ -198,8 +198,9 @@ void briefInput(Text message, String chat) {
 
     }
   
-    for (byte j = 0; j < sizeof(students)/sizeof(students[0]); j++) {
-      String address = "values/[";
+    for (byte j = 0; j < sizeof(students)/sizeof(students[0]); j++) {                     // некоторые пустые ячейки диапазона могут отсутствовать вовсе в полученном из таблицы JSON -> достраиваем такие пропуски
+      String address = "values/[";                                                        // а некоторые могут присутствовать в виде пустой ячейки
+      FirebaseJsonData data;                                                             // см. политику оптимизации трафика при транзакциях пустых ячеек запрашиваемого диапазона Google Sheets API (v4 на момент разработки)
       address += j;
       address += "]/[0]";
       if (getJsonData(nki_array[less], address, false) == "invalidPath") {
@@ -224,7 +225,6 @@ void briefInput(Text message, String chat) {
   for (int i = input_found-1 + presence_mode; i < message.count("\n"); i++) { 
     SpaceStringParse(message.getSub(i, "\n"), temp_dataa, post_symbol);         // см. описание ниже
     Text dataa(temp_dataa);
-    byte surname_length[2] = {};                                                //количество фамилий этой подгруппы перед найденной. Нужно для вставки фамилии в документе на правильное место
 
     bool surname_found = false;
     byte min_syntax_errors = 250;
@@ -238,20 +238,23 @@ void briefInput(Text message, String chat) {
 
       if (func_res == 1) {       //если фамилия безошибочно найдена в списке фамилий
         //------------------Здесь ставим Нку нужному человеку-----------------------------
-        
-        address += surname_length[students[ind].subgroup];
+        if (!targetSubgroup[students[ind].subgroup]) {                          // пользователь ввел фамилию у подгруппы которой нет нужной пары
+          serviceMess.edit((!students[ind].subgroup) ? "Первая" : "Вторая" + String(" подгруппа не имеет некоторых введенных занятий в запрашиваемый день!"), 10000);
+          return;
+        }
+
+        address += ind;
         address += "]/[0]";
 
-        for (byte less = 0; less < lessons_found; less++) {
-          nki_array[students[ind].subgroup][less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[students[ind].subgroup][less], address, true)));
-          need_post[students[ind].subgroup] = true;
+        for (byte less = 0; less < lessons_found; less++) {                     // ставим пропуск на все нужные пары для данной фамилии
+          nki_array[less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[less], address, true)));
         }
       
         surname_found = true;
         break;
       }
 
-      if (func_res == 2 && syntax_errors <= min_syntax_errors) {
+      if (func_res == 2 && syntax_errors <= min_syntax_errors) {                                // встретили вторую фамилию в списке, точно так же похожую на введенную -> невозможно понять, что именно имел ввиду пользователь
         if (syntax_errors == min_syntax_errors) {
           bot.sendMessage(String(ALERT_SYMBOL) + " Невозможно однозначно определить, какая это фамилия: " + dataa.toString() + String(ALERT_SYMBOL), chat);
           timer.add(bot.lastBotMsg(), 20, chat);
@@ -261,38 +264,39 @@ void briefInput(Text message, String chat) {
         min_syntax_errors = syntax_errors;
         assumed_people.surname = students[ind].surname;
         assumed_people.subgroup = students[ind].subgroup;
-        assumed_length = surname_length[students[ind].subgroup];
+        assumed_length = ind;                                                                  // запоминаем индекс фамилии, потом, когда поймем, что она была правильная - без запомненного индекса не поймем, куда ставить 
       }
 
-      if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {
+      if (min_syntax_errors < 250 && ind == sizeof(students)/sizeof(students[0])-1)  {          // Фамилия найдена с ошибками и воспринята как одна из списка
         if (NOTIFY_ERRORS_FIND) {
           bot.sendMessage("Фамилия \"" + dataa.toString() + "\" воспринята как \"" + assumed_people.surname + "\"", chat);
           timer.add(bot.lastBotMsg(), 10, chat);
         }
-        //------------------Здесь ставим Нку нужному человеку-----------------------------                (Фамилия найдена с ошибками и воспринята как одна из списка)
+
+        if (!targetSubgroup[assumed_people.subgroup]) {                          // пользователь ввел фамилию у подгруппы которой нет нужной пары
+          serviceMess.edit((!assumed_people.subgroup) ? "Первая" : "Вторая" + String(" подгруппа не имеет некоторых введенных занятий в запрашиваемый день!"), 10000);
+          return;
+        }
+        //------------------Здесь ставим Нку нужному человеку-----------------------------
         address += assumed_length;
         address += "]/[0]";
 
         for (byte less = 0; less < lessons_found; less++) {
-          nki_array[assumed_people.subgroup][less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[assumed_people.subgroup][less], address, true)));
-          need_post[assumed_people.subgroup] = true;
+          nki_array[less].set(address, UpdateArrayCell(presence_mode, post_symbol, getJsonData(nki_array[less], address, true)));
         }
 
         surname_found = true;
       }
-
-
-      surname_length[students[ind].subgroup]++;         //см. описание к переменной выше
     }
 
-    if (!surname_found) {
+    if (!surname_found) {                                                                       // ваще не нашли ни одного похожего варианта
       bot.sendMessage("Неизвестная фамилия: " + String(dataa) + "!", chat);
       timer.add(bot.lastBotMsg(), 10, chat);
     }
 
-    if (!MemControl.check()) {
+    if (!MemControl.check()) {                                                                  // по мере заполения массива Н-ками не забываем контролировать свободную память
         serviceMess.edit(F("Нехватка RAM! (Заполнение массивов пропусками)"), 7000);
-        for (byte sub = 0; sub < 2; sub++)  for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[sub][lesss].clear();            // очищаем массивы вручную
+        for (byte lesss = 0; lesss < lessons_found; lesss++)  nki_array[lesss].clear();            // очищаем массивы вручную
         return;
     }
   }
@@ -303,29 +307,22 @@ void briefInput(Text message, String chat) {
   // ------------------------------ Выставление новых пропусков ------------------------------
   serviceMess.edit("Выставляю пропуски...");
 
-  for (byte i = 0; i < 2; i++) {
-    if (!need_post[i] && !presence_mode)  {
-      for (byte less = 0; less < lessons_found; less++) nki_array[i][less].clear();
-      continue;
+  String answ = "";
+  tries = 0;
+
+  for (byte less = 0; less < lessons_found; less++) {
+    String range = SheetName;
+    range += charOffset(String(nka.posC), table_indexes[less]);                   // собираем полный вид диапазона для записи
+    range += nka.posI;
+    range += ":";
+    range += charOffset(String(nka.posC), table_indexes[less]);
+    range += nka.posI + sizeof(students)/sizeof(students[0]) - 1;
+
+    while (!GSheet.values.update(&answ, spreadsheetId, range, &nki_array[less]) && tries < SetTryNum) {
+      tries++;
     }
-
-    String answ = "";
-    tries = 0;
-
-    for (byte less = 0; less < lessons_found; less++) {
-      String range = ((!i) ? Sheet1 : Sheet2);
-      range += charOffset(String(nka.posC), table_indexes[i][less]);                   // собираем полный вид диапазона для чтения/записи
-      range += nka.posI;
-      range += ":";
-      range += charOffset(String(nka.posC), table_indexes[i][less]);
-      range += nka.posI + people_in_subgr[i] - 1;
-
-      while (!GSheet.values.update(&answ, spreadsheetId, range, &nki_array[i][less]) && tries < SetTryNum) {
-        tries++;
-      }
-      nki_array[i][less].clear();
-      if (tries == SetTryNum) bot.sendMessage(F("ErrorSendRequest! (Отправка пропусков в Sheet)"), chat);
-    }
+    nki_array[less].clear();         // на всякий очизаем отправленные объекты 
+    if (tries == SetTryNum) bot.sendMessage(F("ErrorSendRequest! (Отправка пропусков в Sheet)"), chat);
   }
   // ------------------------------ Выставление новых пропусков ------------------------------
 
