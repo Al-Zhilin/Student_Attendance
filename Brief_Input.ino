@@ -148,7 +148,7 @@ void briefInput(Text message, String chat) {
   FirebaseJson nki_array[lessons_found];
 
   uint8_t table_indexes[lessons_found] = {};                        // индексы в таблице для каждой выставляемой пары (относительные) для сопоставление теоретического номера пары с фактическими номерами столбцов
-  bool targetSubgroup[2] = {};                                      // "Для какой подгруппы введенные пары могут быть выставлены (корректны)?" [0] - корректны ли для 1 подгруппы, [1] - корректны ли для второй
+  bool targetSubgroup[2] = {true, true};                            // "Для какой подгруппы введенные пары могут быть выставлены (корректны)?" [0] - корректны ли для 1 подгруппы, [1] - корректны ли для второй
 
   nka.surn = "";                                                    // позволяет в алгоритме функции получить не у конкретной, а у первой в списке фамилии posI
   nka.date.day = found_day;
@@ -166,6 +166,7 @@ void briefInput(Text message, String chat) {
         if (!sub_have)  targetSubgroup[1] = false;        // пары нет у второй подгруппы точно
         if (sub_have == 1)  targetSubgroup[0] = false;      // пары нет у первой подгруппы точно
       }
+      else table_indexes[less]++;
     }
     if (!is_found)  {                                                     // если какой-либо введенной пары нет ни у первой, ни у второй подгруппы в расписании
       serviceMess.edit("Пара #" + String(found_less[less]) + " не существует в введенный день ни у одной подгруппы!", 10000);
@@ -182,8 +183,8 @@ void briefInput(Text message, String chat) {
 
 
   // ------------------------------ Получение существующих пропусков ------------------------------
-  for (byte less = 0; less < lessons_found; less++) {
-    String range = SheetName;
+  for (byte less = 0; less < lessons_found; less++) {                             // получаем раздельно, нету особо смысла объединять диапазон в единый, т.к. пары могут быть не в смежных столбцах
+    String range = SheetName;                                                                                                           // может быть позже сделаем оптимизацию случая их смежности
     range += charOffset(String(nka.posC), table_indexes[less]);                   // собираем полный вид диапазона для чтения/записи
     range += nka.posI;
     range += ":";
