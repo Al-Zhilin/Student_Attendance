@@ -129,10 +129,8 @@ struct WeekInfo {
   WeekInfo() {
     for (uint8_t d_iter = 0; d_iter < 7; d_iter++)  days[d_iter].less_info = static_cast<LessInfo*>(malloc(MAX_LESSONS_IN_DAY * sizeof(LessInfo)));               // выделяем с запасом, под MAX_LESSONS_IN_DAY дней
   }
-
   // деструктор в этой структуре необязателен, т.к. она будет существовать на всем протяжении работы программы, а при выключении питания ESP32 SRAM (энергозависимая!!!) самоочиститься, а при перезагрузке - менеджер памяти 
   // переразметит кучу, тем самым, по факту, затрет/инвалидирует все выделенные в ней старые данные. 
-
 } week_object[2];      //0 - текущая неделя, 1 - противоположная по четности;
 
 WeekInfo *week[2] = {&week_object[0], &week_object[1]};           // week[2] - массив указателей на обьекты структуры WeekInfo. 0 - настоящая, 1 - противоположная четность недели
@@ -315,7 +313,7 @@ class Sheet {
         this->getCells(returned_json, range);
 
         returned_json.get(cell, "values/[0]/[0]");
-        if (cell.success) {         // данные присутствуют
+        if (cell.success) {                                            // данные присутствуют
           if (cell.stringValue == WEEK_PARITY_NAME) week[i]->parity = false;
           else week[i]->parity = true;
         }
@@ -381,7 +379,7 @@ class Sheet {
 
         FirebaseJson dayName;
 
-        for (int8_t path_iter = 0; path_iter < settings.table_width[i]+2; path_iter++) {             //+2 нужно чтобы корректно захватить 2 пустые строки после окончания недель
+        for (int8_t path_iter = 0; path_iter < settings.table_width[i]+2; path_iter++) {             //+2 нужно чтобы захватить 2 пустые строки после окончания недель, тем самым убедится в правильности записанной ширины таблицы
           FirebaseJsonData number_cell, subjects_cell;
           snprintf(path, sizeof(path), "values/[0]/[%d]", path_iter);
           returned_json.get(number_cell, path);                                      // получили ячейку с номером пары
@@ -528,7 +526,7 @@ class Sheet {
       valueRange.add("range", range);
       valueRange.add("majorDimension", "ROWS");
 
-      for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) {
+      for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) {              // заполняем массив пропусками на каждую пару обновляемого дня (строки конкретной фамилии в нем)
         String address = "values/[0]/[", data = "";
         address += i;
         address += "]";
@@ -548,29 +546,10 @@ class Sheet {
 
     void Counting(byte start_week, byte end_week) {            // номера недель, ограничивающих область подсчета, нужно для подсчета только конкретного диапазона
       String formula = "", diapason;                                                  // строки для сборки формулы и диапазона
-      byte table_len[2] = {};                                                         // горизонтальная длина таблицы
-
-      for (byte parity_iter = 0; parity_iter < 2; parity_iter++) {                    // Высчитываем len (горизонталную длины недели в таблице) для обоих четностей недель у count.subgroup
-        bool prev = false;
-        for (int s = 0; s < 7; s++) {
-          if (week[count.subgroup + 2*parity_iter]->subj_num[s] == 0) continue;
-          if (prev) table_len[parity_iter] += 1;
-          table_len[parity_iter] += week[count.subgroup + 2*parity_iter]->subj_num[s];
-          prev = true;
-        }
-      }
-
-      /*
-      for (int s = 0; s < 7; s++) {                                         //ищем горизонтальную длину len строки, содержащей номера всех пар для обоих четностей недели подгруппы
-        if (week[i+2*z]->subj_num[s] == 0) continue;
-        if (prev) tableLen[z] += 1;
-        tableLen[z] += week[i+2*z]->subj_num[s];
-        prev = true;
-      }*/
       
       // == Находим позицию вставки формулы в листе === (В данной версии пока так же одинаокова для любого варианта подсчета)
       String form_position = SheetName;
-      form_position += charOffset(String(less_name_c), max(table_len[0], table_len[1]) + 5-1);
+      form_position += charOffset(String(less_name_c), max(table_width[0], table_width[1]) + 5-1);
       form_position += people_list_i + offset * (end_week-1) + count.surn_ind;
 
 
@@ -579,7 +558,7 @@ class Sheet {
         diapason = less_name_c;                                                    // символьное начало диапазона
         diapason += people_list_i + offset * (start_week-1);        // численное начало диапазона
         diapason += ":";
-        diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
+        diapason += charOffset(String(less_name_c), max(table_width[0], table_width[1])-1);
         diapason += people_list_i + offset * (end_week-1) + sizeof(students)/sizeof(students[0]) - 1;
 
         // === Собираем формулу === (в данном случае конечный вид: =COUNTIF(FILTER(C581:U617,MOD(ROW(C581:U617)-588,23)=0),"D")
@@ -602,7 +581,7 @@ class Sheet {
         diapason = less_name_c;
         diapason += less_name_i + offset * (start_week-1);
         diapason += ":";
-        diapason += charOffset(String(less_name_c), max(table_len[0], table_len[1])-1);
+        diapason += charOffset(String(less_name_c), max(table_width[0], table_width[1])-1);
         diapason += people_list_i + offset * (end_week-1) + sizeof(students)/sizeof(students[0]) - 1;
 
         // === Собираем формулу ===, в данном случае ее конечный вид:
@@ -667,7 +646,7 @@ class Sheet {
       result_object.clear();
     }
 
-    bool ready() {
+    bool ready() {                    // обернули библиотечную функцию проверки готовности Листа
       return GSheet.ready();
     }
 
