@@ -481,20 +481,18 @@ class Sheet {
         String log_info = "Данные недели ";
         log_info += (!i) ? "этой" : "предыдущей";
         log_info += " четности";
-        for (uint8_t subgr = 0; subgr < 2; subgr++) {
-          log_info += "\n\nПодгруппа ";
-          log_info += subgr+1;
-          log_info += ": Учебных дней: ";
-          log_info += week[i]->study_days[subgr];
-          for (uint8_t days = 0; days < 7; days++) {
-            log_info += "\n День ";
-            log_info += days+1;
-            log_info += ": ";
-              for (uint8_t p_days = 0; p_days < week[i]->subj_num[subgr][days]; p_days++) {
-                log_info += week[i]->less_nums[subgr][days][p_days];
-                if (p_days != week[i]->subj_num[subgr][days]-1) log_info += ", ";
-              }
-            }
+        for (uint8_t curr_day; curr_day < 7; curr_day++) {
+          log_info += "День #";
+          log_info += curr_day+1;
+          log_info += ": ";
+          if (!week[i]->days[curr_day].subj_num)  log_info += "пар нет!";
+          for (uint8_t curr_less = 0; curr_less < week[i]->days[curr_day].subj_num; curr_less++) {
+            log_info += week[i]->days[curr_day].less_info[curr_less].number;
+            log_info += "(";
+            log_info += (week[i]->days[curr_day].less_info[curr_less].in_subgroup == 2) ? "1 и 2" : (!week[i]->days[curr_day].less_info[curr_less].in_subgroup) ? "1" : "2";
+            log_info += "),";
+          }
+          if (curr_day != 6) log_info += "\n";
         }
         bot.sendMessage(log_info, error_chat);
 
@@ -504,6 +502,7 @@ class Sheet {
         }
         //------------Получаем количество пар в каждый день и их номера, а так же количество учебных дней------------------
       }
+      CriticalError();
       checkTableWeek();                                                 //проверяем неделю на актуальность
     }
 
@@ -549,7 +548,7 @@ class Sheet {
       
       // == Находим позицию вставки формулы в листе === (В данной версии пока так же одинаокова для любого варианта подсчета)
       String form_position = SheetName;
-      form_position += charOffset(String(less_name_c), max(table_width[0], table_width[1]) + 5-1);
+      form_position += charOffset(String(less_name_c), max(settings.table_width[0], settings.table_width[1]) + 5-1);
       form_position += people_list_i + offset * (end_week-1) + count.surn_ind;
 
 
@@ -558,7 +557,7 @@ class Sheet {
         diapason = less_name_c;                                                    // символьное начало диапазона
         diapason += people_list_i + offset * (start_week-1);        // численное начало диапазона
         diapason += ":";
-        diapason += charOffset(String(less_name_c), max(table_width[0], table_width[1])-1);
+        diapason += charOffset(String(less_name_c), max(settings.table_width[0], settings.table_width[1])-1);
         diapason += people_list_i + offset * (end_week-1) + sizeof(students)/sizeof(students[0]) - 1;
 
         // === Собираем формулу === (в данном случае конечный вид: =COUNTIF(FILTER(C581:U617,MOD(ROW(C581:U617)-588,23)=0),"D")
@@ -581,7 +580,7 @@ class Sheet {
         diapason = less_name_c;
         diapason += less_name_i + offset * (start_week-1);
         diapason += ":";
-        diapason += charOffset(String(less_name_c), max(table_width[0], table_width[1])-1);
+        diapason += charOffset(String(less_name_c), max(settings.table_width[0], settings.table_width[1])-1);
         diapason += people_list_i + offset * (end_week-1) + sizeof(students)/sizeof(students[0]) - 1;
 
         // === Собираем формулу ===, в данном случае ее конечный вид:
@@ -654,7 +653,7 @@ class Sheet {
 
 class Menu {
   private:
-    bool ret_command = false, reading_flag = true;
+    bool ret_command = false, reading_flag = true, have_troubles = false;
     byte nka_ind = 0;
     const String s_menu[4] = {"Редактировать", "Подсчитать", "Статистика", "Настройки"};
     String way = "0";
@@ -771,8 +770,13 @@ class Menu {
           }
 
           else if (comm.startsWith("(")) {                                             // если пользователь нажал на конкретную пару в дне
-            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) {
-              if (String(comm[1]) == String(week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->less_nums[nka.dayWeek-1][i])) {
+            comm.replace("(", "");                  // очищаем от всего
+            comm.replace(")", "");                  // что не является
+            comm.replace(" ", "");                  // числом
+            uint8_t parsed_number = comm.toInt();
+
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) {
+              if (parsed_number == week[week[0]->parity != nka.parity]->days[nka.dayWeek].less_info[i].number) {
                 edit_page(4);
                 way = "011111";
                 nka_ind = i;
@@ -784,7 +788,7 @@ class Menu {
           else if (comm == "Все УП") {                                                 // выбрал "поставить УП на все пары в дне"
             N_edited = true;
             nka.nki = "";
-            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '+';
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) nka.nki += '+';
             reading_flag = false;
             edit_page(1);
             return;
@@ -793,7 +797,7 @@ class Menu {
           else if (comm == "Все неУП") {                                               // выбрал "поставить неУП на все пары в дне"
             N_edited = true;
             nka.nki = "";
-            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += '-';
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) nka.nki += '-';
             reading_flag = false;
             edit_page(1);
             return;
@@ -802,7 +806,7 @@ class Menu {
           else if (comm == "Нет пропусков") {                                          // выбрал "убрать пропуски на всех парах в дне"
             N_edited = true;
             nka.nki = "";
-            for (byte i = 0; i < week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]; i++) nka.nki += ' ';
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) nka.nki += ' ';
             reading_flag = false;
             edit_page(1);
             return;
@@ -815,10 +819,13 @@ class Menu {
             range += nka.posC;
             range += nka.posI;
             range += ":";
-            range += charOffset(nka.posC, week[nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2)]->subj_num[nka.dayWeek-1]-1);
+            range += charOffset(nka.posC, week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num-1);
             range += nka.posI;
             if (N_edited) {
-              list.SetN(range);
+              if (!have_troubles) {
+                list.SetN(range);
+              }
+              else bot.sendMessage(F("Установка новых пропусков невозможна! Ранее произошла ошибки при получении данных из таблицы"), user);
               N_edited = false;
             }
             way = "01";
@@ -905,17 +912,17 @@ class Menu {
           nka.dayWeek = t.dayWeek;
           nka.posC = 'A';
           nka.posI = 0;
-          byte len[2] = {};
+          byte surn_len = 0;
           for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
             if (comm == students[i].surname)  {
               count.surn = students[i].surname;
               count.subgroup = students[i].subgroup;
-              count.surn_ind = len[count.subgroup];
+              count.surn_ind = surn_len;
               way = "021";
               calculate_page(1);
               return;
             }
-            len[students[i].subgroup]++;
+            surn_len++;
           }
 
           if (ret_command)  {
@@ -975,6 +982,7 @@ class Menu {
               Date startDate;
               startDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0');
               startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+              startDate.year = (comm[c_index+9] - '0')*10 + (comm[c_index+10] - '0');
 
               bool found = false;
               for (byte i = 0; i < week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
@@ -1041,7 +1049,7 @@ class Menu {
 
         else if (way == "031") {
           if (comm == "Готово") {
-            byte len[2] = {};
+            byte len = 0;
             count.mode = 1;
             bot.sendMessage("Подсчитываю пропуски...", user);
             uint32_t mess_id = bot.lastBotMsg();
@@ -1057,8 +1065,8 @@ class Menu {
             for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
               count.surn = students[i].surname;
               count.subgroup = students[i].subgroup;
-              count.surn_ind = len[count.subgroup];
-              len[students[i].subgroup]++;
+              count.surn_ind = len;
+              len++;
               list.Counting(local_diapason.end, local_diapason.start);
 
               total_list += students[i].surname;
@@ -1099,6 +1107,7 @@ class Menu {
               Date startDate;
               startDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0');
               startDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
+              startDate.year = (comm[c_index+9] - '0')*10 + (comm[c_index+10] - '0');
 
               bool found = false;
               for (byte i = 0; i < week_off; i++) {                     // вычисляем, на расстоянии скольки недель от текущей находится нажатая, путем сравнения дат начала и увеличения даты нажатой каждую итерацию на 7 дней
@@ -1164,32 +1173,11 @@ class Menu {
             Date parsedDate;
             parsedDate.day = (comm[c_index+3] - '0')*10 + (comm[c_index+4] - '0') + (realTime.dayWeek-1);         // не только парсим день, но еще и сравниваем его по дню недели с текущим днем недели, упрощает расчеты ввиду получения кратности разницы
             parsedDate.month = (comm[c_index+6] - '0')*10 + (comm[c_index+7] - '0');
-            // ДОБАВИТЬ parsedDate.year!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            parsedDate.year = (comm[c_index+9] - '0')*10 + (comm[c_index+10] - '0');
             byte week_diff = 0;
 
             
-            int days_between;
-
-            if (parsedDate.month <= realTime.month) {                             // если выбранная неделя в этом, или в одном из прошлый месяцев
-              days_between = getDayInMonth(parsedDate.month - 1, parsedDate.year) - parsedDate.day;
-
-              for (byte i = parsedDate.month; i < realTime.month - 1; i++) {
-                days_between += getDayInMonth(i, realTime.year);                      // ЗДЕСЬ ПОКА ЗАГЛУШКА!!!! ПЕРЕДЕЛАТЬ ЧЕРЕЗ КОЛ-ВО ДНЕЙ ОТ 01.01.2000
-              }
-
-              days_between += realTime.day;
-            }
-            
-            else {                                                               // если выбранная неделя в будущем месяце (месяцах)
-              days_between = getDayInMonth(realTime.month-1, realTime.year) - realTime.day;
-
-              for (byte i = realTime.month; i < parsedDate.month - 1; i++) {
-                days_between += getDayInMonth(i, realTime.year);                       // ЗДЕСЬ ПОКА ЗАГЛУШКА!!!! ПЕРЕДЕЛАТЬ ЧЕРЕЗ КОЛ-ВО ДНЕЙ ОТ 01.01.2000
-              }
-
-              days_between += parsedDate.day;
-              days_between = -days_between;
-            }
+            int days_between = StampUtils::dateToDays2000(realTime.day, realTime.month, realTime.year) - StampUtils::dateToDays2000(parsedDate.day, parsedDate.month, parsedDate.year);
 
             if (abs(days_between) % 7 != 0)  {
               bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель!\nКритично! (settings page)"), error_chat);
@@ -1197,7 +1185,7 @@ class Menu {
               return;
             }
             
-            unknown_ind = week_off - days_between;
+            unknown_ind = week_off - days_between/7;
 
             bot.sendMessage(String(unknown_ind) + "/" + String(week_off), error_chat);
             
@@ -1221,7 +1209,8 @@ class Menu {
         break;
 
         case 1: {
-          /*String range = "", answ;
+          have_troubles = false;
+          String range = "";
           mess = nka.surn;
           mess += "\t";
           mess += nka.subgroup+1;
@@ -1236,35 +1225,44 @@ class Menu {
           mess += nka.date.year % 100;
           mess += "\n";
           getNIndex();
-          byte week_index = nka.subgroup + ((week[nka.subgroup]->parity == nka.parity) ? 0 : 2);                               //индекс недели, складывается из подгруппы и сдвига на неделю, соответствующую выставляемым Нкам по четности
-          if (week[week_index]->subj_num[nka.dayWeek-1])  {               //если в этот день пары есть (в день, соответственной Нке по четности, недели)
+          byte week_index = week[0]->parity != nka.parity;
+          if (week[week_index]->days[nka.dayWeek-1].subj_num)  {               //если в этот день пары есть (в день, соответственной Нке по четности, недели)
             if (reading_flag) {
               nka.nki = "";                                                 //разобраться, почему нужна эта заплатка и починить (если очень захочется :) )
               range += SheetName;
               range += nka.posC;
               range += nka.posI;
               range += ":";
-              range += charOffset(nka.posC, week[week_index]->subj_num[nka.dayWeek-1]-1);
+              range += charOffset(nka.posC, week[week_index]->days[nka.dayWeek-1].subj_num-1);
               range += nka.posI;
-              answ = list.getCells(range);
-              Text answer(answ);
-              for (byte i = 0; i < (week[week_index]->subj_num[nka.dayWeek-1]); i++) {
-                String a = "";
-                answer.getSub(r_count + r_offset*i, "\"").toString(a);
-                if (a == RESPECT_SYMBOL)  nka.nki += "+";
-                else if (a == DISREP_SYMBOL) nka.nki += "-";
-                else nka.nki += " ";
+
+              FirebaseJson returned_json;
+              list.getCells(returned_json, range);
+              for (byte i = 0; i < (week[week_index]->days[nka.dayWeek-1].subj_num); i++) {
+                FirebaseJsonData cell;
+                if (!returned_json.get(cell, "values/[0]/[" + String(i) + "]")) {
+                  bot.sendMessage(F("Произошла ошибка при парсинге существующих пар для отображения в меню!"), error_chat);
+                  nka.nki += "X";   
+                  have_troubles = true;                                                                                           // в меню будем отмечать, что эту пару получить не удалось
+                }
+                else {
+                  if (cell.stringValue == RESPECT_SYMBOL)  nka.nki += "+";
+                  else if (cell.stringValue == DISREP_SYMBOL) nka.nki += "-";
+                  else nka.nki += " ";
+                }
               }
             }
 
-            for (byte i = 0; i < week[week_index]->subj_num[nka.dayWeek-1]; i++) {             //отображать будем пары, которые есть в день, когда Нки будем ставить
+            for (byte i = 0; i < week[week_index]->days[nka.dayWeek-1].subj_num; i++) {             //отображать будем пары, которые есть в день, когда Нки будем ставить
+              if (week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != 2 || week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != nka.subgroup)  continue;   // отображаем только то, что есть у нужной подгруппы
               mess += "(";
-              mess += week[week_index]->less_nums[nka.dayWeek-1][i];
+              mess += week[week_index]->days[nka.dayWeek-1].less_info[i].number;
               mess += ") ";
-              if (nka.nki[i] == '-')  mess += Disrep;
+              if (nka.nki[i] == 'X')  mess += "Err";
+              else if (nka.nki[i] == '-')  mess += Disrep;
               else if (nka.nki[i] == '+') mess += Respect;
               else mess += Presence_menu;
-              if (i != week[week_index]->subj_num[nka.dayWeek-1]-1) mess += "\t";
+              if (i != week[week_index]->days[nka.dayWeek-1].subj_num-1) mess += "\t";
               else mess += "\n";
             }
 
@@ -1275,7 +1273,7 @@ class Menu {
             mess += "В этот день пар нет!\n";
             mess += "Назад\tНа главную";
           }
-          reading_flag = true;*/
+          reading_flag = true;
         }
         break;
 
@@ -1293,7 +1291,7 @@ class Menu {
         }
         break;
 
-        case 3: {                     //переделать полностью (на 3 этапа)
+        case 3: {
           /*
           int k = 1;
           if (nka.month == START_MONTH) k = START_DAY;
@@ -1368,6 +1366,7 @@ class Menu {
     }
 
     void calculate_page(byte calculate_depth) {     // "фронтенд" страниц подменю "Подсчитать"
+
       String mess = "";
       mess.reserve(1024);                             // должно чуточку ускорить работу со стрингами, уберегая от реаллокаций и иных плохостей
       switch (calculate_depth) {
@@ -1427,12 +1426,18 @@ class Menu {
               mess += ".";
               if (date_start.month < 10) mess += "0";
               mess += date_start.month;
+              mess += ".";
+              if (date_start.year < 10) mess += "0";
+              mess += date_start.year;
               mess += " по ";
               if (date_end.day < 10) mess += "0"; 
               mess += date_end.day;
               mess += ".";
               if (date_end.month < 10) mess += "0";
               mess += date_end.month;
+              mess += ".";
+              if (date_end.year < 10) mess += "0";
+              mess += date_end.year;
             }
 
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
@@ -1516,12 +1521,18 @@ class Menu {
               mess += ".";
               if (date_start.month < 10) mess += "0";
               mess += date_start.month;
+              mess += ".";
+              if (date_start.year < 10) mess += "0";
+              mess += date_start.year;
               mess += " по ";
               if (date_end.day < 10) mess += "0"; 
               mess += date_end.day;
               mess += ".";
               if (date_end.month < 10) mess += "0";
               mess += date_end.month;
+              mess += ".";
+              if (date_end.year < 10) mess += "0";
+              mess += date_end.year;
             }
 
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
@@ -1589,12 +1600,19 @@ class Menu {
             mess += ".";
             if (date_start.month < 10) mess += "0";
             mess += date_start.month;
+            mess += ".";
+            if (date_start.year < 10) mess += "0";
+            mess += date_start.year;
             mess += " по ";
             if (date_end.day < 10) mess += "0"; 
             mess += date_end.day;
             mess += ".";
             if (date_end.month < 10) mess += "0";
             mess += date_end.month;
+            mess += ".";
+            if (date_end.year < 10) mess += "0";
+            mess += date_end.year;
+            
 
             sumDate(&date_start, -7);                     // отодвигаем дату назад на неделю
             sumDate(&date_end, -7);
