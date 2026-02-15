@@ -33,7 +33,7 @@ struct fileData {                                                 // струк�
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
 byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
 FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));
-FileData chat_file(&FFat, "/data.dat", 'Z', &chat_settings, sizeof(chat_settings));
+FileData chat_file(&FFat, "/data.dat", 'O', &chat_settings, sizeof(chat_settings));
 FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
 const String months[] PROGMEM = {               //сокращенные названия всех месяцев для отображения в меню

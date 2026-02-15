@@ -16,11 +16,11 @@ int8_t checkTableWeek() {            //функция проверки и дос
   int16_t days_between = StampUtils::dateToDays2000(realTime.day, realTime.month, realTime.year) - StampUtils::dateToDays2000(dateToWeek.day, dateToWeek.month, dateToWeek.year);         // разница в днях
   
   if (days_between < 0) {
+    serviceMess.edit("");
     if (week_off == 1 && days_between == -7) return 0;                  // нормально, это исключительный случай
     bot.sendMessage(F("Внимание! Дата первого дня недели в таблице в будущем, относительно реальной!"), error_chat);
     CriticalError();
   }
-  CriticalError();
 
   if (days_between == 0) {
     serviceMess.edit("В таблице записана актуальная неделя!", 5000);
@@ -33,10 +33,10 @@ int8_t checkTableWeek() {            //функция проверки и дос
       bot.sendMessage(F("WARNING! Возможна ошибка с расчетом количества недель к достариванию!\nКритично!"), error_chat);
       serviceMess.edit("Достроение недель прервано в связи с некорректной работой алгоритма расчета!", 10000);
       return -1;
-    }
+  }
 
   if (week_off + weeksToBuild < 3) {                                        // т.к. первые 2 недели в таблице всего построены изначально - их нет смысла рисовать, просто документируем этот факт и идем пить чяй
-    serviceMess.edit("В таблице записана актуальная неделя!", 5000);
+    serviceMess.edit("В таблице записана актуальная неделя!", 5000);        // ?????????????????  Нужно ли это  ???????????????
     week_off += weeksToBuild;
     week_file.update();
     return weeksToBuild;
