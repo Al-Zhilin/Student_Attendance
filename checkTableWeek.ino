@@ -13,7 +13,15 @@ int8_t checkTableWeek() {            //функция проверки и дос
                                                                                                                                   // 1 и !2! недели построены по умолчанию, но этот факт нам же нужно указать, для корректности увеличения даты в 3 и далее неделе
   sumDate(&dateToWeek, realTime.dayWeek-1);                        //временно сравняем дни недели реальной даты и последней недели в таблице, чтобы сделать все расчеты кратными и тем самым сильно упростить их
 
-  int days_between = StampUtils::dateToDays2000(realTime.day, realTime.month, realTime.year) - StampUtils::dateToDays2000(dateToWeek.day, dateToWeek.month, dateToWeek.year);         // разница в днях
+  int16_t days_between = StampUtils::dateToDays2000(realTime.day, realTime.month, realTime.year) - StampUtils::dateToDays2000(dateToWeek.day, dateToWeek.month, dateToWeek.year);         // разница в днях
+  
+  if (days_between < 0) {
+    if (week_off == 1 && days_between == -7) return 0;                  // нормально, это исключительный случай
+    bot.sendMessage(F("Внимание! Дата первого дня недели в таблице в будущем, относительно реальной!"), error_chat);
+    CriticalError();
+  }
+  CriticalError();
+
   if (days_between == 0) {
     serviceMess.edit("В таблице записана актуальная неделя!", 5000);
     return 0;       //отлично, в таблице прописана актуальная неделя! Создание новой/-ых недели/недель не требуется!

@@ -33,7 +33,7 @@ struct fileData {                                                 // струк�
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
 byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
 FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));
-FileData chat_file(&FFat, "/data.dat", 'V', &chat_settings, sizeof(chat_settings));
+FileData chat_file(&FFat, "/data.dat", 'Z', &chat_settings, sizeof(chat_settings));
 FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
 
 const String months[] PROGMEM = {               //сокращенные названия всех месяцев для отображения в меню
@@ -280,6 +280,9 @@ class ServiceMess {
 
 FB_Time realTime;                            //структура реального времени
 
+
+
+
 class Sheet {
   private:
 
@@ -501,7 +504,7 @@ class Sheet {
         
         if (error_count)  bot.sendMessage("Realloc для less_nums не удалось совершить " + String(error_count) + " раз!", error_chat);
 
-        String log_info = "Данные недели ";
+        /*String log_info = "Данные недели ";                                                 // расскоментировать блок для отладочки
         log_info += (!i) ? "этой" : "предыдущей";
         log_info += " четности\n";
         for (uint8_t curr_day = 0; curr_day < 7; curr_day++) {
@@ -512,12 +515,12 @@ class Sheet {
           for (uint8_t curr_less = 0; curr_less < week[i]->days[curr_day].subj_num; curr_less++) {
             log_info += week[i]->days[curr_day].less_info[curr_less].number;
             log_info += "(";
-            log_info += (week[i]->days[curr_day].less_info[curr_less].in_subgroup == 2) ? "1 и 2" : (!week[i]->days[curr_day].less_info[curr_less].in_subgroup) ? "1" : "2";
+            log_info += (week[i]->days[curr_day].less_info[curr_less].in_subgroup == 2) ? "1/2" : (!week[i]->days[curr_day].less_info[curr_less].in_subgroup) ? "1" : "2";
             log_info += ")  ";
           }
           if (curr_day != 6) log_info += "\n";
         }
-        bot.sendMessage(log_info, error_chat);
+        bot.sendMessage(log_info, error_chat);*/
 
         if (real_width != settings.table_width[i]) {
           settings.table_width[i] = real_width;
@@ -525,7 +528,6 @@ class Sheet {
         }
         //------------ Получаем количество пар в каждый день и их номера, а так же количество учебных дней ------------------
       }
-      CriticalError();
       checkTableWeek();                                                 //проверяем неделю на актуальность
     }
 
@@ -691,7 +693,7 @@ class Menu {
       bot.notify(false);
       if (!mode)  {
         for (byte i = 0; i < sizeof(Admins)/sizeof(Admins[0]); i++) {
-          if (file_status == FD_WRITE || file_status == FD_ADD) {
+          if (file_status == FD_WRITE || file_status == FD_ADD || file_status == FD_RESET) {
             bot.sendMessage("ИСиТенок v" + String(Version, 2), Admins[i]);
             chat_settings.status_mess[i] = bot.lastBotMsg();
           }
@@ -1661,6 +1663,9 @@ class Menu {
 
 } menu;
 
+
+
+
 void setup() {
   Serial.begin(115200);                                                         // последовательный порт аааткрывать
   WiFi_Connect();                                                               // подключаемся к WiFi
@@ -1678,10 +1683,10 @@ void setup() {
   FDstat_t file_stat;
 
   for (byte files = 0; files < 3; files++) {
-    if (!files)  file_stat = chat_file.read();
-    else if (files == 1) file_stat = week_file.read();
-    else file_stat = settings_file.read();
-
+    if (!files) file_stat = week_file.read();
+    else if (files == 1) file_stat = settings_file.read();
+    else file_stat = chat_file.read();                                              // ОБЯЗАТЕЛЬНО! После выхода из цикла переменная file_stat должна содержать данные о chat_file, т.к. далее мы отправляем ее в menu.start_page()!
+                                                                                    // Если в будущем будем добавлять новые файлы - их чтение должно происходить в цикле ПЕРЕД чтением chat_file!
     switch (file_stat) {
       case FD_FS_ERR: bot.sendMessage(F("FileSystemError!"), error_chat);
         break;
@@ -1702,6 +1707,8 @@ void setup() {
   menu.start_page(0, file_stat);       // чисто для обновления структуры FB_Time
   list.begin();
   menu.start_page(1, file_stat);       // вот тут уже отсылаем менюшку
+
+  CriticalError();
 }
 
 void loop() {
