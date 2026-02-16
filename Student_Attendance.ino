@@ -77,6 +77,8 @@ struct Date {
     }
   }
 
+  Date(const Date &other) : day(other.day), month(other.month), year(other.year) {};
+
   Date() : day(1), month(1), year(1970) {};
   
   void operator= (const Date& other) {                // перегружаем присваивание
@@ -278,9 +280,9 @@ class ServiceMess {
 
 } serviceMess;
 
-FB_Time realTime;                            //структура реального времени
+FB_Time realTime;                            // структура реального времени
 
-
+Date StartDate(week[0]->pon_date);           // дата первого дня в семестре. Даже если первый учебный день не понедельник, будет содержать все равно содержать дату первой недели
 
 
 class Sheet {
@@ -464,7 +466,6 @@ class Sheet {
               bot.sendMessage(F("Ошибка парсинга номера пары!"), error_chat);
               CriticalError();
             }
-            week[i]->days[current_day].less_info[current_lesson].number;
             
             week[i]->days[current_day].less_info[current_lesson].in_subgroup = subgr_lesson;              // присутствие этой пары в расписании первой/второй/обоих подгрупп
             week[i]->days[current_day].subj_num++;                                                        // общее суммарное кол-во пар у обоих подгрупп
@@ -529,6 +530,12 @@ class Sheet {
         //------------ Получаем количество пар в каждый день и их номера, а так же количество учебных дней ------------------
       }
       checkTableWeek();                                                 //проверяем неделю на актуальность
+
+        //---------------------- Рассчитываем StartDate ----------------------------
+
+        for (uint8_t weeks_iter = 1; weeks_iter < week_off; weeks_iter++) sumDate(&StartDate, -7);
+
+        //---------------------- Рассчитываем StartDate ----------------------------
     }
 
 
@@ -678,7 +685,7 @@ class Sheet {
 
 class Menu {
   private:
-    bool ret_command = false, reading_flag = true, have_troubles = false;
+    bool ret_command = false, reading_flag = true;
     byte nka_ind = 0;
     const String s_menu[4] = {"Редактировать", "Подсчитать", "Статистика", "Настройки"};
     String way = "0";
@@ -847,10 +854,7 @@ class Menu {
             range += charOffset(nka.posC, week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num-1);
             range += nka.posI;
             if (N_edited) {
-              if (!have_troubles) {
-                list.SetN(range);
-              }
-              else bot.sendMessage(F("Установка новых пропусков невозможна! Ранее произошла ошибки при получении данных из таблицы"), user);
+              list.SetN(range);
               N_edited = false;
             }
             way = "01";
@@ -1234,7 +1238,6 @@ class Menu {
         break;
 
         case 1: {
-          have_troubles = false;
           String range = "";
           mess = nka.surn;
           mess += "\t";
@@ -1261,19 +1264,16 @@ class Menu {
               range += charOffset(nka.posC, week[week_index]->days[nka.dayWeek-1].subj_num-1);
               range += nka.posI;
 
+              bot.sendMessage(range, error_chat);
+
               FirebaseJson returned_json;
               list.getCells(returned_json, range);
               for (byte i = 0; i < (week[week_index]->days[nka.dayWeek-1].subj_num); i++) {
                 FirebaseJsonData cell;
-                if (!returned_json.get(cell, "values/[0]/[" + String(i) + "]")) {
-                  bot.sendMessage(F("Произошла ошибка при парсинге существующих пар для отображения в меню!"), error_chat);
-                  nka.nki += "X";   
-                  have_troubles = true;                                                                                           // в меню будем отмечать, что эту пару получить не удалось
-                }
+                if (!returned_json.get(cell, "values/[0]/[" + String(i) + "]") || cell.stringValue == " ")  nka.nki += " ";
                 else {
                   if (cell.stringValue == RESPECT_SYMBOL)  nka.nki += "+";
                   else if (cell.stringValue == DISREP_SYMBOL) nka.nki += "-";
-                  else nka.nki += " ";
                 }
               }
             }
@@ -1283,10 +1283,10 @@ class Menu {
               mess += "(";
               mess += week[week_index]->days[nka.dayWeek-1].less_info[i].number;
               mess += ") ";
-              if (nka.nki[i] == 'X')  mess += "Err";
+              if (nka.nki[i] == '?')  mess += "Err";
               else if (nka.nki[i] == '-')  mess += Disrep;
               else if (nka.nki[i] == '+') mess += Respect;
-              else mess += Presence_menu;
+              else mess += Presence;
               if (i != week[week_index]->days[nka.dayWeek-1].subj_num-1) mess += "\t";
               else mess += "\n";
             }
@@ -1707,8 +1707,6 @@ void setup() {
   menu.start_page(0, file_stat);       // чисто для обновления структуры FB_Time
   list.begin();
   menu.start_page(1, file_stat);       // вот тут уже отсылаем менюшку
-
-  CriticalError();
 }
 
 void loop() {
