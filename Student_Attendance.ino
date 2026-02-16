@@ -32,9 +32,9 @@ struct fileData {                                                 // струк�
 
 // номер текущей недели (считая от первой недели в таблице, не от первой недели в году!):
 byte week_off = 1;  // НЕ ЗНАЕШЬ - НЕ МЕНЯЙ! О последствиях можно сильно пожалеть!!
-FileData week_file(&FFat, "/weekdata.dat", 'Z', &week_off, sizeof(week_off));
+FileData week_file(&FFat, "/weekdata.dat", 'V', &week_off, sizeof(week_off));
 FileData chat_file(&FFat, "/data.dat", 'O', &chat_settings, sizeof(chat_settings));
-FileData settings_file(&FFat, "/settings.dat", 'Z', &settings, sizeof(settings)); 
+FileData settings_file(&FFat, "/settings.dat", 'V', &settings, sizeof(settings)); 
 
 const String months[] PROGMEM = {               //сокращенные названия всех месяцев для отображения в меню
   "Янв",
@@ -282,7 +282,7 @@ class ServiceMess {
 
 FB_Time realTime;                            // структура реального времени
 
-Date StartDate(week[0]->pon_date);           // дата первого дня в семестре. Даже если первый учебный день не понедельник, будет содержать все равно содержать дату первой недели
+Date StartDate;                              // дата первого дня в семестре. Даже если первый учебный день не понедельник, будет содержать все равно содержать дату первой недели
 
 
 class Sheet {
@@ -309,13 +309,14 @@ class Sheet {
             ESP.restart();
           }
 
-          bot.sendMessage("Попытка подключения к GSheet " + String(tryes_num) + "/" + GSHEET_CONNECT_ATT, error_chat);
+          serviceMess.edit("Попытка подключения к GSheet " + String(tryes_num) + "/" + GSHEET_CONNECT_ATT);
         }
-
       }
       //digitalWrite(2, false);
 
       serviceMess.edit("Google Sheet API успешно подключено!\nПолучаю информацию о текущей неделе...");
+
+      realTime = bot.getTime(3);                 // синхронизируем время!
 
       for (byte i = 0; i < 2; i++) {             // парсим данные о текущей и предыдущей неделе
         String range = "";
@@ -361,9 +362,13 @@ class Sheet {
             uint16_t parsedYear = rawDate.substring(secondDot + 1).toInt();
 
             if (parsedYear < 100) {                                                                // если в таблице год указан неполно (26 вместо 2026) - достараиваем недостающую часть
-                week[i]->pon_date.year = (realTime.year / 100) * 100 + parsedYear;
+              if (!bot.timeSynced())  {
+                bot.sendMessage(F("Не могу понять, какой сейчас год, т.к. структура реального времени не содержит данных! Предположу, что сейчас 21 век..."), error_chat);
+                week[i]->pon_date.year = 2000 + parsedYear;
+              }
+              else week[i]->pon_date.year = (realTime.year / 100) * 100 + parsedYear;
             } else {
-                week[i]->pon_date.year = parsedYear;
+              week[i]->pon_date.year = parsedYear;
             }
           }
 
@@ -371,7 +376,7 @@ class Sheet {
             bot.sendMessage(F("Структура заглавной ячейки недели некорректна!"), error_chat);
             CriticalError();
           }
-          
+
           bool days_found = false;
           for (uint8_t daysInWeek = 0; daysInWeek < 7; daysInWeek++) if (firstDayName == DaysOfWeek[daysInWeek] && (days_found = true)) sumDate(&week[i]->pon_date, -(current_day = daysInWeek));  // оппаааа, красивая фишечка для флага, да?
           if (!days_found)  bot.sendMessage("Неизвестное имя дня недели обнаружено в диапазоне данных первого учебного дня недели: \"" + firstDayName + "\"", error_chat);                                                                 // а еще красивее заранее запоминаем индекс - нужен позже
@@ -532,9 +537,10 @@ class Sheet {
       checkTableWeek();                                                 //проверяем неделю на актуальность
 
         //---------------------- Рассчитываем StartDate ----------------------------
-
+        
+        StartDate = week[0]->pon_date;
         for (uint8_t weeks_iter = 1; weeks_iter < week_off; weeks_iter++) sumDate(&StartDate, -7);
-
+        
         //---------------------- Рассчитываем StartDate ----------------------------
     }
 
@@ -704,7 +710,8 @@ class Menu {
             bot.sendMessage("ИСиТенок v" + String(Version, 2), Admins[i]);
             chat_settings.status_mess[i] = bot.lastBotMsg();
           }
-          else bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);
+          //else bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);           // Оказалось!!, чтоо
+          else serviceMess.edit("ИСиТенок v" + String(Version, 1));                                                     // Именно этот вариант позволяет realTime реально синхронизироваться... а другой нет
         }
         chat_file.update();
         return;
