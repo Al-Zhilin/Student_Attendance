@@ -1305,7 +1305,7 @@ class Menu {
         case 2: {
           mess = "";
 
-          for (int i = START_MONTH; i < t.month+1; i++) {
+          for (int i = StartDate.month; i < t.month+1; i++) {
             mess += months[i-1];
             if (i % 3 == 1 || i == t.month) mess += "\n";
             else mess += "\t";
@@ -1345,7 +1345,7 @@ class Menu {
 
           //этап 1 (сдвиг начала месяца)
           int k = 1;
-          if (nka.date.month == START_MONTH) k = START_DAY;
+          if (nka.date.month == StartDate.month) k = StartDate.day;
           byte day_n = nka.date.day;                   
           byte dayWeek_n = nka.dayWeek;
           nka.date.day = k;
