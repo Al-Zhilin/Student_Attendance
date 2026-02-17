@@ -305,7 +305,7 @@ class Sheet {
           tryes_num++;
 
           if (tryes_num == GSHEET_CONNECT_ATT) {
-            bot.sendMessage(F("Вышел таймаут ожидания подключения к GoogleSheet! Перезагружаюсь..."), error_chat);
+            serviceMess.edit("Вышел таймаут ожидания подключения к GoogleSheet! Перезагружаюсь...");
             ESP.restart();
           }
 
@@ -710,8 +710,11 @@ class Menu {
             bot.sendMessage("ИСиТенок v" + String(Version, 2), Admins[i]);
             chat_settings.status_mess[i] = bot.lastBotMsg();
           }
-          //else bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[0]);           // Оказалось!!, чтоо
-          else serviceMess.edit("ИСиТенок v" + String(Version, 1));                                                     // Именно этот вариант позволяет realTime реально синхронизироваться... а другой нет
+          else {
+            bot.editMessage(chat_settings.status_mess[i], "Initialization..", Admins[i]);
+            bot.editMessage(chat_settings.status_mess[i], "ИСиТенок v" + String(Version, 1), Admins[i]);
+          }
+          
         }
         chat_file.update();
         return;
