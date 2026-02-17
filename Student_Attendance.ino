@@ -86,6 +86,12 @@ struct Date {
     this->month = other.month;
     this->year = other.year;
   }
+
+  bool operator<(const Date& other) const {
+    if (year != other.year) return year < other.year;
+    if (month != other.month) return month < other.month;
+    return day < other.day;
+  }
 };
 
 void sumDate(Date *date, int day_offset);
@@ -283,6 +289,7 @@ class ServiceMess {
 FB_Time realTime;                            // структура реального времени
 
 Date StartDate;                              // дата первого дня в семестре. Даже если первый учебный день не понедельник, будет содержать все равно содержать дату первой недели
+
 
 
 class Sheet {
@@ -733,7 +740,6 @@ class Menu {
     }
 
     void menuEdit(String comm, String user) {        // обработка нажатий в меню
-      FB_Time t = bot.getTime(3);
       static bool N_edited = false;
 
       if (comm == "На главную" && way != "0") {
@@ -782,10 +788,10 @@ class Menu {
         if (way == "01") {                                                            // отображается страница выбора фамилии
           nka.surn = "";
           nka.nki = "";
-          nka.date.month = t.month;
-          nka.date.day = t.day;
-          nka.date.year = t.year;
-          nka.dayWeek = t.dayWeek;
+          nka.date.month = realTime.month;
+          nka.date.day = realTime.day;
+          nka.date.year = realTime.year;
+          nka.dayWeek = realTime.dayWeek;
           nka.posC = 'A';
           nka.posI = 0;
           for (byte i = 0; i < sizeof(students)/sizeof(students[0]); ++i) {
@@ -818,7 +824,7 @@ class Menu {
             uint8_t parsed_number = comm.toInt();
 
             for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) {
-              if (parsed_number == week[week[0]->parity != nka.parity]->days[nka.dayWeek].less_info[i].number) {
+              if (parsed_number == week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].number) {
                 edit_page(4);
                 way = "011111";
                 nka_ind = i;
@@ -885,10 +891,10 @@ class Menu {
         }
 
         else if (way == "0111") {                                                          // выбор месяца
-          nka.date.month = t.month;
-          nka.date.day = t.day;
-          nka.date.year = t.year;
-          nka.dayWeek = t.dayWeek;
+          nka.date.month = realTime.month;
+          nka.date.day = realTime.day;
+          nka.date.year = realTime.year;
+          nka.dayWeek = realTime.dayWeek;
           for (int i = 0; i < 12; i++) {
             if (comm == months[i]) {
               nka.date.month = i+1;
@@ -945,10 +951,10 @@ class Menu {
         if (way == "02") {
           nka.surn = "";
           nka.nki = "";
-          nka.date.month = t.month;
-          nka.date.day = t.day;
-          nka.date.year = t.year;
-          nka.dayWeek = t.dayWeek;
+          nka.date.month = realTime.month;
+          nka.date.day = realTime.day;
+          nka.date.year = realTime.year;
+          nka.dayWeek = realTime.dayWeek;
           nka.posC = 'A';
           nka.posI = 0;
           byte surn_len = 0;
@@ -1278,7 +1284,7 @@ class Menu {
 
               FirebaseJson returned_json;
               list.getCells(returned_json, range);
-              for (byte i = 0; i < (week[week_index]->days[nka.dayWeek-1].subj_num); i++) {
+              for (uint8_t i = 0; i < (week[week_index]->days[nka.dayWeek-1].subj_num); i++) {
                 FirebaseJsonData cell;
                 if (!returned_json.get(cell, "values/[0]/[" + String(i) + "]") || cell.stringValue == " ")  nka.nki += " ";
                 else {
@@ -1288,20 +1294,18 @@ class Menu {
               }
             }
 
-            for (byte i = 0; i < week[week_index]->days[nka.dayWeek-1].subj_num; i++) {             //отображать будем пары, которые есть в день, когда Нки будем ставить
-              if (week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != 2 || week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != nka.subgroup)  continue;   // отображаем только то, что есть у нужной подгруппы
+            for (uint8_t i = 0; i < week[week_index]->days[nka.dayWeek-1].subj_num; i++) {             // отображать будем пары, которые есть в день, когда Нки будем ставить
+              if (week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != 2 && week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != nka.subgroup)  continue;   // отображаем только то, что есть у нужной подгруппы
+              if (i)  mess += "\t";
               mess += "(";
               mess += week[week_index]->days[nka.dayWeek-1].less_info[i].number;
-              mess += ") ";
-              if (nka.nki[i] == '?')  mess += "Err";
-              else if (nka.nki[i] == '-')  mess += Disrep;
+              mess += ")";
+              if (nka.nki[i] == '-')  mess += Disrep;
               else if (nka.nki[i] == '+') mess += Respect;
               else mess += Presence;
-              if (i != week[week_index]->days[nka.dayWeek-1].subj_num-1) mess += "\t";
-              else mess += "\n";
             }
 
-            mess += "Все УП\tВсе неУП\tНет пропусков\n";
+            mess += "\nВсе УП\tВсе неУП\tНет пропусков\n";
             mess += "Назад\tНа главную\tПоставить";
           }
           else {
