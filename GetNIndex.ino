@@ -51,7 +51,7 @@
   uint16_t sm = 1;
   
   for (int i = 0; i < days_ago; i++) {
-    sm += week[week[0]->parity != nka.parity]->days[days_ago].subj_num;
+    sm += 1+week[week[0]->parity != nka.parity]->days[i].subj_num;
   }   // P.S. алгоритм получил "магические числа" в процессе оптимизации, см. ранние коммиты (до февраля 2026), чтобы вникнуть в суть
   
   nka.posC = charOffset(String(people_list_c), sm);

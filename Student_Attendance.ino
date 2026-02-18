@@ -835,8 +835,8 @@ class Menu {
 
           else if (comm == "Все УП") {                                                 // выбрал "поставить УП на все пары в дне"
             N_edited = true;
-            nka.nki = "";
-            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) nka.nki += '+';
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) 
+                if (week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == nka.subgroup || week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == 2) nka.nki[i] = '+';
             reading_flag = false;
             edit_page(1);
             return;
@@ -844,8 +844,10 @@ class Menu {
 
           else if (comm == "Все неУП") {                                               // выбрал "поставить неУП на все пары в дне"
             N_edited = true;
-            nka.nki = "";
-            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) nka.nki += '-';
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) {
+                if (week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == nka.subgroup || week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == 2) nka.nki[i] = '-';
+            }
+            bot.sendMessage("\"" + nka.nki + "\"", error_chat);
             reading_flag = false;
             edit_page(1);
             return;
@@ -853,8 +855,8 @@ class Menu {
 
           else if (comm == "Нет пропусков") {                                          // выбрал "убрать пропуски на всех парах в дне"
             N_edited = true;
-            nka.nki = "";
-            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) nka.nki += ' ';
+            for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) 
+                if (week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == nka.subgroup || week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == 2) nka.nki[i] = ' ';
             reading_flag = false;
             edit_page(1);
             return;
@@ -878,7 +880,7 @@ class Menu {
             return;
           }
 
-          else if (comm.startsWith("В этот")) {                                        // нажал на плашку "В этот день пар нет" (любопытный тестировщик)
+          else if (comm.startsWith("В этот")) {                                            // нажал на плашку "В этот день пар нет" (любопытный тестировщик)
             bot.sendMessage("Чо жмешь? Сказали же, пар в выбранный день нет!", user);
             timer.add(bot.lastBotMsg(), 7, user);
             return;
@@ -1272,15 +1274,13 @@ class Menu {
           byte week_index = week[0]->parity != nka.parity;
           if (week[week_index]->days[nka.dayWeek-1].subj_num)  {               //если в этот день пары есть (в день, соответственной Нке по четности, недели)
             if (reading_flag) {
-              nka.nki = "";                                                 //разобраться, почему нужна эта заплатка и починить (если очень захочется :) )
+              nka.nki = "";
               range += SheetName;
               range += nka.posC;
               range += nka.posI;
               range += ":";
               range += charOffset(nka.posC, week[week_index]->days[nka.dayWeek-1].subj_num-1);
               range += nka.posI;
-
-              bot.sendMessage(range, error_chat);
 
               FirebaseJson returned_json;
               list.getCells(returned_json, range);
@@ -1293,10 +1293,11 @@ class Menu {
                 }
               }
             }
-
+            bool space_flag = false;              // предотвращает случайные \t перед первой парой в дне, что мешает отображению меню
             for (uint8_t i = 0; i < week[week_index]->days[nka.dayWeek-1].subj_num; i++) {             // отображать будем пары, которые есть в день, когда Нки будем ставить
               if (week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != 2 && week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != nka.subgroup)  continue;   // отображаем только то, что есть у нужной подгруппы
-              if (i)  mess += "\t";
+              if (space_flag)  mess += "\t";
+              space_flag = true;
               mess += "(";
               mess += week[week_index]->days[nka.dayWeek-1].less_info[i].number;
               mess += ")";
