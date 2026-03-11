@@ -347,7 +347,7 @@ class Sheet {
         }
 
         else {
-          bot.sendMessage(F("Ошибка парсинга заглавное ячейки недели!"), error_chat);
+          bot.sendMessage("Ошибка парсинга заглавной ячейки недели!\nPosition: " + range, error_chat);
           CriticalError();
         }
         //------------ Получаем четность с заглавной ячейки недели -------------
@@ -552,15 +552,15 @@ class Sheet {
     }
 
 
-      void getCells(FirebaseJson &answ, const String &range) {                 // функция получения данных из таблицы
-        byte tries = 0;
-        answ.clear();
-        while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
-          tries++;
-        }
-
-        if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
+    void getCells(FirebaseJson &answ, const String &range) {                 // функция получения данных из таблицы
+      byte tries = 0;
+      answ.clear();
+      while (!GSheet.values.get(&answ, spreadsheetId, range) && tries < GetTryNum) {
+        tries++;
       }
+
+      if (tries == GetTryNum) bot.sendMessage("getError", error_chat);
+    }
 
     void SetN(const String &range) {                       // базовая функция постановки Нок для одного человека в один день
       String answ = "";
@@ -847,7 +847,6 @@ class Menu {
             for (byte i = 0; i < week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].subj_num; i++) {
                 if (week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == nka.subgroup || week[week[0]->parity != nka.parity]->days[nka.dayWeek-1].less_info[i].in_subgroup == 2) nka.nki[i] = '-';
             }
-            bot.sendMessage("\"" + nka.nki + "\"", error_chat);
             reading_flag = false;
             edit_page(1);
             return;
@@ -1284,15 +1283,22 @@ class Menu {
 
               FirebaseJson returned_json;
               list.getCells(returned_json, range);
+              String prs;
+              returned_json.toString(prs, true);
+              
               for (uint8_t i = 0; i < (week[week_index]->days[nka.dayWeek-1].subj_num); i++) {
                 FirebaseJsonData cell;
-                if (!returned_json.get(cell, "values/[0]/[" + String(i) + "]") || cell.stringValue == " ")  nka.nki += " ";
+                if (!returned_json.get(cell, "values/[0]/[" + String(i) + "]"))  nka.nki += " ";                // см. про оптимизацию трафика GSheet и пути с пустыми значениями, которые он иногда может недосылать
                 else {
-                  if (cell.stringValue == RESPECT_SYMBOL)  nka.nki += "+";
-                  else if (cell.stringValue == DISREP_SYMBOL) nka.nki += "-";
+                  String parsed_value = cell.stringValue;
+                  parsed_value.trim();
+                  if (parsed_value == RESPECT_SYMBOL)  nka.nki += '+';
+                  else if (parsed_value == DISREP_SYMBOL) nka.nki += '-';
+                  else if (parsed_value == PRESENCE_SYMBOL) nka.nki += ' ';
                 }
               }
             }
+
             bool space_flag = false;              // предотвращает случайные \t перед первой парой в дне, что мешает отображению меню
             for (uint8_t i = 0; i < week[week_index]->days[nka.dayWeek-1].subj_num; i++) {             // отображать будем пары, которые есть в день, когда Нки будем ставить
               if (week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != 2 && week[week_index]->days[nka.dayWeek-1].less_info[i].in_subgroup != nka.subgroup)  continue;   // отображаем только то, что есть у нужной подгруппы

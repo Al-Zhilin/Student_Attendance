@@ -1,11 +1,14 @@
 void briefInput(Text message, String chat) {
+  bot.tickManual();
   byte input_found = 0;           // 0 - нет ввода, 1 - есть, без условия, 2 - есть, с условием
   byte found_less[MAX_LESSONS] = {}, faza = 0, syntax_errors = 0, tries = 0, lessons_found = 0;
   const String ignored_symbols = ",. ";    // символы, которые пользователь в теории может запихать между значащими частями в сокращенном вводе
   String supp = "", post_symbol = "", temp_dataa = "";
   byte presence_mode = 0;                  // режим выставления пропусков наоборот. Указанные фамилии будут восприниматься как присутствующие, а не по стандарту, как отсутствующие
   MemoryControl MemControl;
-  Date found_date(0, 0, realTime.year);
+  Date found_date;
+  found_date.day = 0;
+  found_date.month = 0;                    // не в конструкторе, чтобы обойти его проверки!
 
   post_symbol.reserve(10);
 
@@ -71,7 +74,7 @@ void briefInput(Text message, String chat) {
         else if (isDigit(symbol[0])) {
           found_date.day = found_date.day*10 + (symbol[0] - '0');
           if (found_date.day > 31)  {
-            serviceMess.edit("Значение дня в сокращенном вводе некорректно: \"" + String(found_date.day) + "\"!");
+            serviceMess.edit("Значение дня в сокращенном вводе некорректно: \"" + String(found_date.day) + "\"!", 15000);
             return;
           }
         }
@@ -81,7 +84,7 @@ void briefInput(Text message, String chat) {
         if (isDigit(symbol[0])) {
           found_date.month = found_date.month*10 + (symbol[0] - '0');
           if (found_date.month > 12)  {
-            serviceMess.edit("Значение месяца в сокращенном вводе некорректно: \"" + String(found_date.month) + "\"!");
+            serviceMess.edit("Значение месяца в сокращенном вводе некорректно: \"" + String(found_date.month) + "\"!", 15000);
             return;
           }
         }
@@ -119,6 +122,15 @@ void briefInput(Text message, String chat) {
     else if (faza == 1) {
       serviceMess.edit("Неправильный ввод условия при сокращенном вводе! Образец: \"1 пара 02.03\"\nУсловие некорректно из-за некорректной записи слова \"пара\"!", 7000);
       return;
+    }
+
+    found_date.year = realTime.year;
+    Date now_date(realTime.day, realTime.month, realTime.year);
+    
+    if (now_date < found_date) {                                  // если добавили год как текущий, а дата получилась из будущего - значит год все таки предыдущий надо было добавлять
+      Date week_date(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);
+      sumDate(&week_date, 7);
+      if (week_date < found_date) found_date.year--;              // а если все таки дата в будущем, но находится дальше НА ТЕКУЩЕЙ неделе? Если уж нет, то без вариантов ошиблись
     }
     //------------------------------ Перебираем, на какой фазе остановился цикл ------------------------------
   }
@@ -160,6 +172,7 @@ void briefInput(Text message, String chat) {
   for (uint8_t less = 0; less < lessons_found; less++) {            // перебираем все введенные пары, чтобы 
     bool is_found = false;
     for (uint8_t todays_less = 0; todays_less < week[week_index]->days[nka.dayWeek-1].subj_num; todays_less++) {          // цикл по всем парам нужного дня
+      Serial.println(todays_less);
       if (week[week_index]->days[nka.dayWeek-1].less_info[todays_less].number == found_less[less]) {
         is_found = true;
         uint8_t sub_have = week[week_index]->days[nka.dayWeek-1].less_info[todays_less].in_subgroup;
@@ -178,6 +191,8 @@ void briefInput(Text message, String chat) {
       return;
     }
   }
+
+  return;
   // ------------------------------ Валидация введенных пользователем пар ------------------------------
   
 

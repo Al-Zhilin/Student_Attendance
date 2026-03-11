@@ -7,9 +7,8 @@ int8_t checkTableWeek() {            //функция проверки и дос
     timer.add(bot.lastBotMsg(), 10, error_chat);
     return -1;
   }
-
   //---------------------Проверяем, актуальна ли неделя в Таблице, если нет - считаем количество отсутствующих недель---------------------
-  Date dateToWeek(week[week_off == 1]->pon_date.day, week[week_off == 1]->pon_date.month, week[week_off == 1]->pon_date.year);    // Вопросы к индексу? Разбирайся с логикой построки для случая начала семестра:
+  Date dateToWeek(week[0]->pon_date.day, week[0]->pon_date.month, week[0]->pon_date.year);    // Вопросы к индексу? Разбирайся с логикой построки для случая начала семестра:
                                                                                                                                   // 1 и !2! недели построены по умолчанию, но этот факт нам же нужно указать, для корректности увеличения даты в 3 и далее неделе
   sumDate(&dateToWeek, realTime.dayWeek-1);                        //временно сравняем дни недели реальной даты и последней недели в таблице, чтобы сделать все расчеты кратными и тем самым сильно упростить их
 
@@ -35,6 +34,9 @@ int8_t checkTableWeek() {            //функция проверки и дос
       return -1;
   }
 
+  Serial.println(week_off + String("-") + weeksToBuild + String("-") + days_between);
+  Serial.println(realTime.day + String(":") + realTime.month + "/" + dateToWeek.day + ":" + dateToWeek.month);
+
   if (week_off + weeksToBuild < 3) {                                        // т.к. первые 2 недели в таблице всего построены изначально - их нет смысла рисовать, просто документируем этот факт и идем пить чяй
     serviceMess.edit("В таблице записана актуальная неделя!", 5000);        // ?????????????????  Нужно ли это  ???????????????
     week_off += weeksToBuild;
@@ -54,8 +56,9 @@ int8_t checkTableWeek() {            //функция проверки и дос
   }
   
   sumDate(&dateToWeek, 6);
+  if (week_off == 1)  sumDate(&dateToWeek, 7);
 
-  for (byte iter = ((week_off == 1) ? 1 : 0); iter < weeksToBuild; iter++) {        //достраиваем weeksToBuild недель. Учитывает, что первые 2 недели в таблице всегда построены
+  for (byte iter = ((week_off == 1) ? 1 : 0); iter < weeksToBuild; iter++) {        // достраиваем weeksToBuild недель. Учитывает, что первые 2 недели в таблице всегда построены
 
     MemControl.resetKeep();         // сбрасывает сохраненное значение памяти
 
